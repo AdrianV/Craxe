@@ -2,3 +2,5 @@
 main.cr
 main.nim
 nimboot.nim
+out
+bin
