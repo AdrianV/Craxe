@@ -18,4 +18,5 @@ typedef ArgumentInfo = {
      * Type of argument
      */
     var t(default, null):haxe.macro.Type;
+
 }

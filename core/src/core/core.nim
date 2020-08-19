@@ -16,14 +16,14 @@ type
     # Value object
     Struct* = object of HaxeObject
 
-    ValueType* = int | string | float | object
 
-    Null*[ValueType] = object
-        case has*:bool
-        of true:
-            value*:ValueType
-        of false:
-            discard
+    ValueType* = bool | int32 | string | float | object 
+
+    Null*[T: ValueType] = ref object of HaxeObject
+        value*: T
+
+
+    NullAbstr*[T] = Null[T]
 
     # --- Haxe Iterator ---
 
@@ -114,6 +114,16 @@ proc bpOperator*[T](val:var T):T {.discardable, inline.} =
     inc(val)
     result = val
 
+# --a
+proc ammOperator*[T](val:var T):T {.discardable, inline.} =        
+    result = val
+    dec(val)
+
+# --a
+proc bmmOperator*[T](val:var T):T {.discardable, inline.} =        
+    dec(val)
+    result = val
+
 template `+`*(s:string, i:untyped): string =
     s & $i
 
@@ -134,15 +144,55 @@ template length*(this:string) : int =
 template charAt*(this:string, pos:int) : string =
     $this[pos]
 
-proc `==`*(v1:Null[ValueType], v2:ValueType):bool =
-    if v1.has:
-        return v1.value == v2
-    return false
+converter toValue* [T: ValueType] (v:Null[T]): T {.inline.} =
+    if not v.isNil: result = v.value
 
-proc `$`*(this:Null[ValueType]):string =
-    if this.has:
-        return $this.value
-    return "nil"
+converter fromValue* [T: ValueType](v:T): Null[T] {.inline.} =
+    Null[T](value: v) 
+
+converter fromValue* (v:int): Null[int32] {.inline.} =
+    Null[int32](value: v.int32) 
+
+when false:
+    template toNull* [T](v:typeof(nil)): Null[T] =
+        Null[T](has: false)
+
+    template toNull*[T](v:T): Null[T] =
+        Null[T](has: true, value: v)
+    
+#template `!=`* [T] (v1:Null[T], n: typeof(nil)): bool =
+#    v1.has
+
+#template `==`* [T] (v1:Null[T], n: typeof(nil)): bool =
+#    not v1.has
+
+template `==`* (v1:string, n: typeof(nil)): bool =
+    false
+
+#template `.`* [T](v: Null[T], f: untyped) =
+#    v.value.f
+
+#template `.=`* [T,V](v: var Null[T], f: untyped, val: V) =
+#    v.value.`f` = val
+
+#from macros import unpackVarargs
+
+#template `.()`* [T](v: Null[T]; f: untyped, args: varargs[untyped]): untyped =
+#  unpackVarargs(s.value.f, args)
+
+
+#template `==`* [T] (v1:Null[T], n: typeof(nil)): bool =
+#    isNil(v1.value)
+
+template `==`* [T:ValueType] (v1:Null[T], n: typeof(nil)): bool =
+    v1.isNil
+
+template `==`* [T:ValueType](v1:Null[T], v2:T):bool =
+    not v1.isNil and v1.value == v2
+    
+
+proc `$`* [T:ValueType] (this:Null[T]):string =
+    if this.isNil: "null"  else: $(this.value)
 
 proc `==`*(v1:Hashable, v2:Hashable):bool =
     v1.hash() == v2.hash()
@@ -153,10 +203,8 @@ template hash*(this:HaxeObjectRef):int =
 proc `==`*(v1:HaxeObjectRef, v2:HaxeObjectRef):bool =
     v1.hash() == v2.hash()
 
-proc `==`*[T](v1:Null[T], v2:Null[T]):bool =
-    if v1.has and v2.has:
-        return v1.value == v2.value    
-    return false
+template `==`*[T: ValueType](v1:Null[T], v2:Null[T]):bool =
+    return if not v1.isNil and not v2.isNil : v1.value == v2.value else : v1.isNil and v2.isNil
 
 # Scoped block
 template valueBlock*(body : untyped) : untyped = 
@@ -167,18 +215,33 @@ template valueBlock*(body : untyped) : untyped =
 # --- Haxe Array ---
 
 # HaxeArray
-proc newHaxeArray*[T]() : HaxeArray[T] =
-    result = HaxeArray[T]()
 
-proc newHaxeArray*[T](data:seq[T]) : HaxeArray[T] =
-    result = HaxeArray[T](data: data)
+template newHaxeArray*[T](): HaxeArray[T] = HaxeArray[T]()
+    
+template `[]`*[T](this:HaxeArray[T], pos:Natural):T =
+    #let this = this
+    if pos >= 0 and pos < this.data.len: this.data[pos] else: T.default
+    
+template get*[T](this:HaxeArray[T], pos:Natural):T =
+    #let this = this
+    if pos == 437504: echo this.data.len
+    if pos >= 0 and pos < this.data.len: this.data[pos] else: T.default
 
-proc `[]`*[T](this:HaxeArray[T], pos:int):T =
-    this.data[pos]
+template `[]=`*[T](this:var HaxeArray[T], pos:Natural, v: T) =
+    if pos >= 0 :
+        if pos >= this.data.len: setLen(this.data, pos + 1)
+        this.data[pos] = v
 
-template push*[T](this:HaxeArray[T], value:T):int =
+template set* [T] (this:var HaxeArray[T], pos:Natural, v: T) =
+    if pos >= 0 :
+        if pos == 437504: echo this.data.len
+        if pos >= this.data.len: setLen(this.data, pos + 1)
+        this.data[pos] = v
+
+    
+template push*[T](this:HaxeArray[T], value:T):int32 =
     this.data.add(value)
-    len(this.data)
+    len(this.data).int32
 
 template pop*[T](this:HaxeArray[T]): T =
     let last = this.data.len - 1
@@ -186,11 +249,11 @@ template pop*[T](this:HaxeArray[T]): T =
     delete(this.data, last)
     res
 
-template get*[T](this:HaxeArray[T], pos:int): T =
-    this.data[pos]
+#template get*[T](this:HaxeArray[T], pos:int): T =
+#    this.data[pos]
 
-template length*[T](this:HaxeArray[T]): int =    
-    this.data.len
+template length*[T](this:HaxeArray[T]): int32 =    
+    this.data.len.int32
 
 template `$`*[T](this:HaxeArray[T]) : string =
     $this.data
@@ -280,7 +343,7 @@ proc getField*(this:AnonObject, name:string):Dynamic =
     return nil
 
 proc getFields*(this:AnonObject):HaxeArray[string] =
-    result = newHaxeArray[string]()
+    result = HaxeArray[string]()
     for f in this:
         discard result.push(f.name)
 
@@ -379,3 +442,20 @@ proc `$`*(this:HaxeEnum) : string =
 
 proc `==`*(e1:HaxeEnum, e2:int) : bool {.inline.} =
     result = e1.index == e2
+
+# --- closure hack ----
+proc rawClosure* [T: proc](prc: pointer, env: pointer): T {.noSideEffect, inline.} =
+  {.emit: """
+  `result`->ClP_0 = `prc`;
+  `result`->ClE_0 = `env`;
+  """.}
+
+#template rawClosure* [T: proc](prce: untyped, enve: untyped) =
+#    let prc = cast[pointer](prce)
+#    let env = cast[pointer](enve)
+#    var closure : T
+#    {.emit: """
+#    `closure`->ClP_0 = `prc`;
+#    `closure`->ClE_0 = `env`;
+#    """.}
+#    closure

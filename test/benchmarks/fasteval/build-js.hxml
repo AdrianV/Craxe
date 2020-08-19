@@ -1,0 +1,7 @@
+-cp src
+-D analyzer-optimize
+-main Main
+-debug
+#--interp
+-D js-es=6
+--js bin/app.js

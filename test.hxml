@@ -1,0 +1,10 @@
+develop_nim.hxml
+
+-D nim-out=./out/main.nim
+-D nim-dynamic=enable
+-D nim-speed=debug
+-D nim-extra=-r
+--main test.Main
+-D analyzer-optimize
+
+-lib zlender

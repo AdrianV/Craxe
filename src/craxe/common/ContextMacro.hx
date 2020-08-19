@@ -19,15 +19,16 @@ class ContextMacro {
         throw "Not supported";
     }
 
+    static var dynIsSupported: Null<Bool> = null;
     /**
      * Check if dynamic supported and throw exception if not
      */
     public static function ckeckDynamicSupport() {
         #if macro
-        var supported = Context.getDefines().get("nim-dynamic") == "enable";
-        if (supported)
+        if (dynIsSupported == null)
+            dynIsSupported = Context.getDefines().get("nim-dynamic") == "enable";
+        if (dynIsSupported)
             return;
-        
         Context.fatalError("Dynamic is restricted. Please, add -D nim-dynamic=enable to your configuration, or remove all Dynamic type from the code.", Context.currentPos());
         #end
         throw "Not supported";

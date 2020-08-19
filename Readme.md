@@ -1,4 +1,7 @@
-# Warning. Just an experiment. Lot of bugs!!!
+# Warning. Still just an experiment. Lot of bugs!!!
+
+This is fork of https://github.com/RapidFingers/Craxe
+I have changed the code a lot. So many things are working and many more are broken
 
 ## Transpiler from haxe to nim (http://nim-lang.org/)
 
@@ -6,17 +9,24 @@
 * High performance.
 * Low memory footprint.
 * Stable garbage collector, or maybe no GC at all (owned/unowned ref).
-* Async IO: Files, TCP, UDP, HTTP, HTTPS, Websockets.
+* Make most Haxe Code compile
+* Start working on a standard library
 
 ## What it's all good for?
 
 Backend, micro services, iot, calculations, haxe compiler :)
 
-## Why not go, rust, D and other languages?
+## Why nim?
 
-Because.
+* Because nim does all the heavy stuff like garbage collection and is very advanced here. 
+  See the memory heavy benchmarks.
+* It is very easy to use nim code from Haxe
+* Nim allows you to choose the right garabge collectors for your need
+* Fast and easy compilation
 
 ## What it can do:
+
+I changed a lot. So the list might have changed:
 
 * Classes: 
     - inheritance
@@ -26,7 +36,7 @@ Because.
     - instance fields
 * Interfaces
 * Typedefs
-* Anonymous
+* Anonymous - maybe broken now
 * Basic types: 
     - Int
     - Float
@@ -51,12 +61,10 @@ Because.
 
 ## How to use it
 
-* Install lix packet manager https://github.com/lix-pm/lix.client
 * Install nim compiler with https://github.com/dom96/choosenim
-* Install craxecore library by "nimble install https://github.com/RapidFingers/Craxe?subdir=core"
-* Create lix project
-* Select haxe 4.0.0-rc3 compiler
-* Add craxe library with lix from github https://github.com/RapidFingers/Craxe
+* Install craxecore library by "nimble install https://github.com/AdrianV/Craxe?subdir=core"
+* Install latest haxe build from https://build.haxe.org/builds/haxe/
+* Install craxe with `haxelib git craxe https://github.com/AdrianV/Craxe`
 * Add build.hxml with following strings:\
 -cp src\
 --macro craxe.Generator.generate()\
@@ -70,6 +78,7 @@ Because.
 It will generate code and will launch the nim compiler\
 "nim c -d:release filename.nim"
 
+
 ## Examples
 
 https://github.com/RapidFingers/CraxeExamples
@@ -79,7 +88,7 @@ https://github.com/RapidFingers/CraxeExamples
 - [x] Switch expression
 - [x] Inheritance
 - [x] Interfaces
-- [x] BrainF**k benchmark
+- [?] BrainF**k benchmark
 - [x] Basic externs implementation
 - [x] Closures
 - [x] Typedefs
@@ -89,13 +98,13 @@ https://github.com/RapidFingers/CraxeExamples
 - [x] Generics
 - [x] GADT
 - [x] Map/Dictionary
-- [x] Method override
+- [?] Method override
 - [x] Place all nim code to nimble library
 - [x] Extern for CraxeCore's http server
 - [x] Benchmark of async http server
 - [x] Possibility to add raw nim code
-- [x] Dynamic type
-- [x] haxe.Json
+- [?] Dynamic type
+- [ ] haxe.Json
 - [ ] Extern for native nim iterators
 - [ ] Mysql database driver
 - [ ] Craxe http server benchmark with json and mysql

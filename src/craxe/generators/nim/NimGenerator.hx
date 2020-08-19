@@ -24,7 +24,7 @@ class NimGenerator extends BaseGenerator {
 	/**
 	 * Default out file
 	 */
-	static inline final DEFAULT_OUT = "main.nim";
+	static public inline final DEFAULT_OUT = "main.nim";
 
 	/**
 	 * Type context
@@ -82,20 +82,14 @@ class NimGenerator extends BaseGenerator {
 	 */
 	function generateTypeFields(sb:IndentStringBuilder, args:Array<ArgumentInfo>) {
 		for (arg in args) {
-			sb.add(arg.name);
+			sb.add(NimNames.fixFieldVarName(arg.name));
 			sb.add(" : ");
 			sb.add(typeResolver.resolve(arg.t));
 			sb.addNewLine(Same);
 		}
 	}
 
-	/**
-	 * Generate function arguments
-	 * Example:
-	 *
-	 * 	proc someproc(arg1:int, arg2:float) =
-	 */
-	function generateFuncArguments(sb:IndentStringBuilder, args:Array<ArgumentInfo>) {
+	function generateEnumArgumentsImpl(sb:IndentStringBuilder, args:Array<ArgumentInfo>) {
 		for (i in 0...args.length) {
 			var arg = args[i];
 			sb.add(arg.name);
@@ -107,18 +101,40 @@ class NimGenerator extends BaseGenerator {
 	}
 
 	/**
-	 * Generate function arguments for Abstract type
+	 * Generate function arguments
+	 * Example:
+	 *
+	 * 	proc someproc(arg1:int, arg2:float) =
 	 */
-	function generateFuncArgumentsAbstract(sb:IndentStringBuilder, abstr:AbstractType, args:Array<ArgumentInfo>) {
+	function generateFuncArguments(sb:IndentStringBuilder, args:Array<{v:TVar, value:Null<TypedExpr>}>) {
 		for (i in 0...args.length) {
 			var arg = args[i];
-			if (arg.name.indexOf("this") >= 0) {
-				sb.add('${arg.name}1');
-			} else {
-				sb.add(arg.name);
-			}
+			final name = MethodExpressionGenerator.scopes.createVar(arg.v, true);
+			sb.add(name);
 			sb.add(":");
-			if (arg.name == "this") {
+			sb.add(typeResolver.resolve(arg.v.t));
+			if (arg.value != null) switch arg.value.expr {
+				case null:
+				case TConst(c): 
+					sb.add(" = ");
+					methodBodyGenerator.generateTConst(sb, c);
+				case v: throw 'unsupported $v';
+			}
+			if (i + 1 < args.length)
+				sb.add(", ");
+		}
+	}
+
+	/**
+	 * Generate function arguments for Abstract type
+	 */
+	function generateFuncArgumentsAbstract(sb:IndentStringBuilder, abstr:AbstractType, args:Array<{v: TVar}>, isStatic: Bool) {
+		for (i in 0...args.length) {
+			var arg = args[i].v;
+			final name = MethodExpressionGenerator.scopes.createVar(arg, true);
+			sb.add(name);
+			sb.add(":");
+			if ( !isStatic && i == 0) {
 				sb.add('${abstr.name}Abstr');
 			} else {
 				sb.add(typeResolver.resolve(arg.t));
@@ -150,7 +166,7 @@ class NimGenerator extends BaseGenerator {
 			case TEnum(_, _):
 			// skip
 			case TFun(args, _):
-				generateFuncArguments(sb, args);
+				generateEnumArgumentsImpl(sb, args);
 			case v:
 				sb.add(typeResolver.resolve(v));
 		}
@@ -198,7 +214,7 @@ class NimGenerator extends BaseGenerator {
 	 */
 	function generateEnumHelpers(sb:IndentStringBuilder, enumInfo:EnumInfo, constr:EnumField) {
 		var enumName = '${enumInfo.enumType.name}${constr.name}';
-		sb.add('proc `$`(this: ${enumName}) : string {.inline.} =');
+		sb.add('proc `$`(this: ${enumName}) : system.string {.inline.} =');
 		sb.addNewLine(Inc);
 		sb.add("result = $this[]");
 		sb.addBreak();
@@ -344,14 +360,14 @@ class NimGenerator extends BaseGenerator {
 		for (an in anons) {
 			var anonName = an.name;
 
-			sb.add('proc getFields(this:${anonName}):HaxeArray[string] {.inline.} =');
+			sb.add('proc getFields(this:${anonName}):HaxeArray[system.string] {.inline.} =');
 			sb.addNewLine(Inc);
 			var fldNames = an.fields.map(x -> '"${x.name}"').join(", ");
-			sb.add('return newHaxeArray[string](@[${fldNames}])');
+			sb.add('return HaxeArray[system.string](data: @[${fldNames}])');
 
 			sb.addBreak();
 
-			sb.add('proc getFieldByNameInternal(this:${anonName}, name:string):Dynamic =');
+			sb.add('proc getFieldByNameInternal(this:${anonName}, name:system.string):Dynamic =');
 			sb.addNewLine(Inc);
 			if (an.fields.length > 0) {
 				sb.add("case name");
@@ -365,7 +381,7 @@ class NimGenerator extends BaseGenerator {
 
 			sb.addBreak();
 
-			sb.add('proc setFieldByNameInternal(this:${anonName}, name:string, value:Dynamic):void =');
+			sb.add('proc setFieldByNameInternal(this:${anonName}, name:system.string, value:Dynamic):void =');
 			sb.addNewLine(Inc);
 			if (an.fields.length > 0) {
 				sb.add("case name");
@@ -382,11 +398,11 @@ class NimGenerator extends BaseGenerator {
 			sb.add('proc makeDynamic(this:${anonName}):Dynamic {.inline.} =');
 			sb.addNewLine(Inc);
 
-			sb.add("this.getFields = proc():HaxeArray[string] = getFields(this)");
+			sb.add("this.getFields = proc():HaxeArray[system.string] = getFields(this)");
 			sb.addNewLine(Same);
-			sb.add("this.getFieldByName = proc(name:string):Dynamic = getFieldByNameInternal(this, name)");
+			sb.add("this.getFieldByName = proc(name:system.string):Dynamic = getFieldByNameInternal(this, name)");
 			sb.addNewLine(Same);
-			sb.add("this.setFieldByName = proc(name:string, value:Dynamic):void = setFieldByNameInternal(this, name, value)");
+			sb.add("this.setFieldByName = proc(name:system.string, value:Dynamic):void = setFieldByNameInternal(this, name, value)");
 			sb.addNewLine(Same);
 			sb.add("return toDynamic(this)");
 			sb.addBreak();
@@ -408,6 +424,7 @@ class NimGenerator extends BaseGenerator {
 						opt: false,
 						t: ifield.type
 					});
+				case FMethod(_):
 				case v:
 					throw 'Unsupported ${v}';
 			}
@@ -442,18 +459,20 @@ class NimGenerator extends BaseGenerator {
 			baseTypeName;
 		}
 
-		var line = '${clsName}${params} = ref object of ${superName}';
-		sb.add(line);
-		sb.addNewLine(Same);
-
-		generateInstanceFields(sb, cls.fields, cls.isHashable);
+		if (true || cls.fields.length > 0 || cls.methods.length > 0) {
+			var line = '${clsName}${params} = ref object of ${superName}';
+			sb.add(line);
+			sb.addNewLine(Same);
+			generateInstanceFields(sb, cls.fields, cls.isHashable);	
+		}
 
 		var staticFields = cls.classType.statics.get();
 		if (staticFields.length > 0) {
 			var line = '${cls.classType.name}Static = object of HaxeObject';
 			sb.add(line);
 			sb.addNewLine(Same);
-			sb.addNewLine(Same, true);
+			//sb.addNewLine(Same, true);
+			generateInstanceFields(sb, staticFields, false);	
 		}
 	}
 
@@ -492,18 +511,36 @@ class NimGenerator extends BaseGenerator {
 
 		var clsName = typeResolver.getFixedTypeName(cls.classType.name);
 		var hasStaticMethod = false;
+		var hasStaticVar = false;
 		for (field in staticFields) {
 			switch (field.kind) {
 				case FMethod(k):
 					hasStaticMethod = true;
+					break;
+				case FVar(read, write):
+					hasStaticVar = true;
 					break;
 				case v:
 					throw 'Unsupported paramter ${v}';
 			}
 		}
 
-		if (hasStaticMethod) {
-			sb.add('let ${clsName}StaticInst = ${clsName}Static()');
+		if (hasStaticMethod || hasStaticVar) {
+			sb.add('let ${clsName}StaticInst = ${clsName}Static(');
+			if (hasStaticVar) {
+				var first = true;
+				for (f in staticFields) switch f.kind {
+					case FVar(read, write):
+						if (f.expr != null) {
+							if (!first) sb.add(", ");
+							sb.add('${f.name} :');
+							methodBodyGenerator.generateTBlockSingleExpression(sb, f.expr(), false);
+							first = false;
+						}
+					case _:
+				}
+			}
+			sb.add(")");
 			sb.addBreak();
 		}
 	}
@@ -516,6 +553,40 @@ class NimGenerator extends BaseGenerator {
 
 		sb.addNewLine();
 		sb.addNewLine(None, true);
+	}
+
+	function constructorIsPure(constrExpr: TypedExpr): Bool {
+		switch constrExpr.expr {
+			case TFunction(_.expr.expr => TBlock(el)):
+				for (e in el) {
+					switch e.expr {
+						case TBinop(OpAssign, _.expr => TField(_.expr => TConst(TThis), FInstance(_, _, _)) , _):
+						case _: return false;
+					}
+				}
+				return true;
+			case _:
+		}
+		return false;
+	}
+
+	function buildPureConstructor(sb: IndentStringBuilder, constrExpr: TypedExpr) {
+		switch constrExpr.expr {
+			case TFunction(_.expr.expr => TBlock(el)):
+				var first = true;
+				for (e in el) {
+					switch e.expr {
+						case TBinop(OpAssign, _.expr => TField(_.expr => TConst(TThis), FInstance(_, _, cf)) , e2):
+							final fname = NimNames.fixFieldVarName(cf.get().name);
+							if ( ! first) sb.add(",");
+							sb.add('$fname: ');
+							methodBodyGenerator.generateTBlockSingleExpression(sb, e2, false);
+							first = false;
+						case _:
+					}
+				}
+			case _:
+		}
 	}
 
 	/**
@@ -536,24 +607,25 @@ class NimGenerator extends BaseGenerator {
 			if (superCls.constructor != null)
 				superConstructor = superCls.constructor.get();
 		}
-
-		switch (constructor.type) {
-			case TFun(args, _):
-				var constrExp = constructor.expr();
+		final constrExp = constructor.expr();
+		switch [constrExp.t, constrExp.expr] {
+			case [TFun(_, _), TFunction(tfunc)]:
+				MethodExpressionGenerator.scopes.newScope();
 				var params = typeResolver.resolveParameters(cls.params);
 
+				final supportsDynamic = typeContext.isDynamicSupported(className);
 				// Generate procedures for dynamic support
-				if (typeContext.isDynamicSupported(className)) {
+				if (supportsDynamic) {
 					var fields = cls.classType.fields.get();
 
-					sb.add('proc getFields(this:${className}):HaxeArray[string] {.inline.} =');
+					sb.add('proc getFields(this:${className}):HaxeArray[system.string] {.inline.} =');
 					sb.addNewLine(Inc);
 					var fldNames = fields.map(x -> '"${x.name}"').join(", ");
-					sb.add('return newHaxeArray[string](@[${fldNames}])');
+					sb.add('return HaxeArray[system.string](data: @[${fldNames}])');
 
 					sb.addBreak();
 					
-					sb.add('proc getFieldByNameInternal${params}(this:${className}${params}, name:string):Dynamic =');
+					sb.add('proc getFieldByNameInternal${params}(this:${className}${params}, name:system.string):Dynamic =');
 					sb.addNewLine(Inc);
 					if (fields.length > 0) {
 						sb.add("case name");
@@ -573,50 +645,73 @@ class NimGenerator extends BaseGenerator {
 					sb.add('cast[${className}${params}](this.fclass)');
 					sb.addBreak();
 				}
+				final isPure = constructorIsPure(constrExp);
+				var sbCon = new IndentStringBuilder();
+				if (! isPure || supportsDynamic) {
+					// Generate constructor
+					MethodExpressionGenerator.scopes.newScope();
+					sbCon.add('proc new${className}${params}(');
+					generateFuncArguments(sbCon, tfunc.args);
+					sbCon.add(') : ${className}${params} {.inline.}');
+					sb.add(sbCon.toString());
+				} else {
+					sb.add('template new${className}${params}(');
+					generateFuncArguments(sb, tfunc.args);
+					sb.add(') : ${className}${params} =');
+					sb.addNewLine(Inc);
+					sb.add('${className}${params}(');
+					buildPureConstructor(sb, constrExp);
+					sb.add(")");
+					sb.addNewLine(Dec);
+				}
+				sb.addBreak();
 
 				// Generate init proc for haxe "super(params)"
+				MethodExpressionGenerator.scopes.newScope();
 				sb.add('proc init${className}${params}(this:${className}${params}');
-				if (args.length > 0) {
+				if (tfunc.args.length > 0) {
 					sb.add(", ");
-					generateFuncArguments(sb, args);
+					generateFuncArguments(sb, tfunc.args);
 				}
-				sb.add(') {.inline.} =');
+				sb.add(') =');
 				sb.addNewLine(Inc);
 
 				if (cls.isHashable) {
 					sb.add("this.hash = proc():int = this.hashCode()");
 					sb.addNewLine(Same);
 				}
-
 				generateMethodBody(sb, cls, constrExp);
-				sb.addNewLine(Dec);
-
-				// Generate constructor
-				sb.add('proc new${className}${params}(');
-				generateFuncArguments(sb, args);
-				sb.add(') : ${className}${params} {.inline.} =');
-				sb.addNewLine(Inc);
-				sb.add('var this = ${className}${params}()');
-				sb.addNewLine(Same);
-				sb.add('init${className}(this');
-				if (args.length > 0) {
-					sb.add(", ");
-					sb.add(args.map(x -> x.name).join(", "));
-				}
-				sb.add(')');
-
-				if (typeContext.isDynamicSupported(className)) {
+				sb.addNewLine(Dec);	
+				MethodExpressionGenerator.scopes.popScope();
+				if (! isPure || supportsDynamic) {
+					// Generate constructor
+					sbCon.add(" =");
+					sb.add(sbCon.toString());
+					sb.addNewLine(Inc);
+					sb.add('var this = ${className}${params}()');
 					sb.addNewLine(Same);
-					sb.add("this.getFields = proc():HaxeArray[string] = getFields(this)");
+					sb.add('init${className}(this');
+					if (tfunc.args.length > 0) {
+						sb.add(", ");
+						sb.add(tfunc.args.map(x -> MethodExpressionGenerator.scopes.getVarName(x.v.name, x.v.id)).join(", "));
+					}
+					sb.add(')');
+
+					if (supportsDynamic) {
+						sb.addNewLine(Same);
+						sb.add("this.getFields = proc():HaxeArray[system.string] = getFields(this)");
+						sb.addNewLine(Same);
+						sb.add("this.getFieldByName = proc(name:system.string):Dynamic = getFieldByNameInternal(this, name)");
+					}
+
 					sb.addNewLine(Same);
-					sb.add("this.getFieldByName = proc(name:string):Dynamic = getFieldByNameInternal(this, name)");
+					sb.add("return this");
+					sb.addBreak();
+					MethodExpressionGenerator.scopes.popScope();
 				}
 
-				sb.addNewLine(Same);
-				sb.add("return this");
-
-				sb.addBreak();
-			case v:
+				MethodExpressionGenerator.scopes.popScope();
+			case [v, _]:
 				throw 'Unsupported paramter ${v}';
 		}
 	}
@@ -625,21 +720,24 @@ class NimGenerator extends BaseGenerator {
 	 * Build class method
 	 */
 	function generateClassMethod(sb:IndentStringBuilder, cls:ClassInfo, method:ClassField, isStatic:Bool) {
-		switch (method.type) {
-			case TFun(args, ret):
+		final expr = method.expr();
+		switch [expr.t, expr.expr] {
+			case [TFun(_, ret), TFunction(tfunc)]:
+				MethodExpressionGenerator.scopes.newScope();
 				var clsName = !isStatic ? cls.classType.name : '${cls.classType.name}Static';
 				sb.add('proc ${method.name}(this:${clsName}');
-				if (args.length > 0) {
+				if (tfunc.args.length > 0) {
 					sb.add(", ");
-					generateFuncArguments(sb, args);
+					generateFuncArguments(sb, tfunc.args);
 				}
 				sb.add(") : ");
 				sb.add(typeResolver.resolve(ret));
 				sb.add(" =");
 				sb.addNewLine(Inc);
 
-				generateMethodBody(sb, cls, method.expr(), ret);
-			case v:
+				generateMethodBody(sb, cls, expr, ret);
+				MethodExpressionGenerator.scopes.popScope();
+			case [v, _]:
 				throw 'Unsupported paramter ${v}';
 		}
 	}
@@ -648,23 +746,27 @@ class NimGenerator extends BaseGenerator {
 	 * Build class method for abstract
 	 */
 	function generateMethodAbstract(sb:IndentStringBuilder, cls:ClassInfo, abstr:AbstractType, method:ClassField, isStatic:Bool) {
-		switch (method.type) {
-			case TFun(args, ret):
+		final expr = method.expr();
+		switch [expr.t, expr.expr] {
+			case [TFun(_, ret), TFunction(tfunc)]:
+				MethodExpressionGenerator.scopes.newScope();
 				var name = abstr.name;
 				var methname = StringTools.replace(method.name, "_", "");
-				var parstr = typeResolver.resolveParameters(abstr.params.map(x -> x.t));
+				final params = abstr.params.concat(method.params);
+				var parstr = typeResolver.resolveParameters(params.map(x -> x.t));
 
 				sb.add('proc ${methname}${name}Abstr${parstr}(');
-				if (args.length > 0) {
-					generateFuncArgumentsAbstract(sb, abstr, args);
+				if (tfunc.args.length > 0) {
+					generateFuncArgumentsAbstract(sb, abstr, tfunc.args, isStatic);
 				}
 				sb.add(") : ");
 				sb.add(typeResolver.resolve(ret));
 				sb.add(" =");
 				sb.addNewLine(Inc);
 
-				generateMethodBody(sb, cls, method.expr(), ret);
-			case v:
+				generateMethodBody(sb, cls, expr, ret);
+				MethodExpressionGenerator.scopes.popScope();
+			case [v, _]:
 				throw 'Unsupported paramter ${v}';
 		}
 	}
@@ -675,6 +777,23 @@ class NimGenerator extends BaseGenerator {
 	function generateClassMethods(sb:IndentStringBuilder, cls:ClassInfo) {
 		for (method in cls.methods) {
 			generateClassMethod(sb, cls, method, false);
+		}
+
+		switch cls.classType.kind {
+			case KAbstractImpl(a):
+				for (f in cls.staticFields) {
+					if (f.isExtern) continue;
+					final info = methodBodyGenerator.getStaticTFieldData(cls.classType, f);
+					final ft = typeResolver.resolve(f.type);
+					sb.add('var ${info.totalName}: $ft');
+					final expr = f.expr();
+					if (expr != null) {
+						sb.add(" = ");
+						methodBodyGenerator.generateTBlockSingleExpression(sb, expr, false);
+					}
+					sb.addBreak();
+				}
+			case _:
 		}
 
 		for (method in cls.staticMethods) {
@@ -692,7 +811,7 @@ class NimGenerator extends BaseGenerator {
 		switch cls.classType.kind {
 			case KNormal:
 				var clsName = cls.classType.name;
-				sb.add('proc `$`(this:${clsName}) : string {.inline.} = ');
+				sb.add('proc `$`(this:${clsName}) : system.string {.inline.} = ');
 				sb.addNewLine(Inc);
 				sb.add('result = "${clsName}"' + " & $this[]");
 				sb.addBreak();

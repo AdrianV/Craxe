@@ -18,9 +18,9 @@ class TypeResolver {
 	 */
 	static final simpleTypes = [
 		"Bool" => "bool",
-		"Int" => "int",
+		"Int" => "int32",
 		"Float" => "float",
-		"String" => "string",
+		"String" => "system.string",
 		"Void" => "void"
 	];
 
@@ -79,17 +79,23 @@ class TypeResolver {
 
 		if (generatePassModificator(sb, t, params))
 			return;
-
 		var name = t.name;
-		var parstr = resolveParameters(params);
 
-		switch name {
-			case "Async":
-				name = 'Future${parstr} {.async.}';
-			default:
-				name = '${name}Abstr${parstr}';	
+		if (name == "Null" && params.length == 1) {
+			final p0 = resolve(params[0]);
+			switch p0 {
+				case "bool" | "int32" | "float" | "system.string" : name = 'Null[$p0]';
+				case _: name = p0;
+			}
+		} else {
+			var parstr = resolveParameters(params);
+			switch name {
+				case "Async":
+					name = 'Future${parstr} {.async.}';
+				default:
+					name = '${name}Abstr${parstr}';	
+			}
 		}
-
 		sb.add('${name}');
 	}
 
@@ -112,7 +118,10 @@ class TypeResolver {
 	 * Generate TType
 	 */
 	function generateTType(sb:StringBuf, t:DefType, params:Array<Type>) {
-		sb.add('Dynamic');
+		if (params.length > 0) {
+			final ps = resolveParameters(params);
+			sb.add(t.name + ps);
+		} else sb.add(t.name);
 	}
 
 	/**
@@ -123,6 +132,7 @@ class TypeResolver {
 		sb.add(args.map(x -> '${x.name}:${resolve(x.t)}').join(", "));
 		sb.add("):");
 		sb.add(resolve(ret));
+		sb.add(' {.closure.}');
 	}
 
 	/**

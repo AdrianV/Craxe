@@ -1,0 +1,43 @@
+build.hxml
+--each
+
+--js bin/tree.js 
+-D nodejs
+
+--next
+--hl bin/tree.hl
+
+--next
+--hl bin/hl-src/main.c
+#--cmd gcc -I bin/hl-src -I ~/dev/hl/src/ -O3 bin/hl-src/main.c -L. -lhl -std=c11 -msse2 -m64 -o bin/tree-hl
+# adjust the path according to your setup
+
+--next
+--jvm bin/tree.jar
+
+
+--next
+--cpp bin/cpp-src
+-D HXCPP-GC-GENERATIONAL
+
+--next
+--cppia bin/tree.cppia
+
+--next
+--cs bin/cs-src
+
+--next
+--lua bin/tree.lua
+-D luajit
+
+--next 
+--neko bin/tree.n
+
+--next
+-lib craxe
+--macro craxe.Generator.generate()
+--no-output
+-D nim
+-D nim-out=./bin/nim/main.nim
+-D nim-dynamic=enable
+-D eval-stack

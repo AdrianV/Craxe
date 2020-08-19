@@ -1,5 +1,6 @@
 package craxe;
 
+import craxe.common.ast.type.ClassInfo;
 import haxe.PosInfos;
 import haxe.Log;
 import haxe.macro.Type;
@@ -12,6 +13,7 @@ import craxe.common.compiler.BaseCompiler;
  */
 class Generator {
 	#if macro
+
 	public static function generate() {
 		haxe.macro.Context.onGenerate(onGenerate);
 	}
@@ -26,6 +28,23 @@ class Generator {
 		var compiler:BaseCompiler = null;
 
 		var processed = preprocessor.process(types);
+		var classes = processed.classes;
+		#if (false)
+		haxe.macro.Context.onAfterGenerate(() -> {
+			if (classes != null) {
+				for (c in classes) {
+					final m = c.classType.name;
+					try {
+						final all = haxe.macro.Context.getModule(m);
+						trace('module $m data: ${all.length}');
+					} catch (e) {
+						trace('module $m not found');
+					}
+				}
+	
+			}
+		});
+		#end
 
 		Log.trace = (v:Dynamic, ?infos:PosInfos) -> {			
 			var str = Std.string(v);

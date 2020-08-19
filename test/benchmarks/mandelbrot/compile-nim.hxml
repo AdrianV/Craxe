@@ -1,0 +1,11 @@
+--main Mandelbrot
+-D nim-out=./bin/nim/main.nim
+--macro craxe.Generator.generate()
+--no-output
+-D nim
+-D nim-speed=fastest
+-D nim-gc=arc
+-D eval-stack
+-lib craxe
+
+#-D anon_objects
