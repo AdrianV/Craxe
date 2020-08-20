@@ -14,6 +14,6 @@ Nim is winner here, but only close followed by the JVM again. The next fastest C
 
 The unfameous mandelbrot benchmark from the Haxe repository. It is again a memory allocation heavy benchmark. JVM and C++ are winners here, nim follows closely.
 
-Nim anon objects do not work here yet !
+the Nim version with anon_objects is already faster (2.9sec) than C++ (6.4 sec) and hashlink (29sec)
 
 

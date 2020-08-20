@@ -1,5 +1,4 @@
 --main Mandelbrot
--D nim-out=./bin/nim/main.nim
 --macro craxe.Generator.generate()
 --no-output
 -D nim
@@ -7,5 +6,9 @@
 -D nim-gc=arc
 -D eval-stack
 -lib craxe
+--each
+-D nim-out=./bin/nim/main.nim
 
-#-D anon_objects
+--next
+-D nim-out=./bin/nim/main_anon.nim
+-D anon_objects
