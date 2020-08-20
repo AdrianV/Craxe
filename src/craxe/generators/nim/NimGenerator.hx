@@ -401,7 +401,7 @@ class NimGenerator extends BaseGenerator {
 
 			sb.addBreak();
 
-			sb.add('proc makeDynamic(this:${anonName}):Dynamic {.inline.} =');
+			sb.add('proc makeDynamic(this:${anonName}) =');
 			sb.addNewLine(Inc);
 
 			sb.add("this.getFields = proc():HaxeArray[system.string] = getFields(this)");
@@ -409,8 +409,6 @@ class NimGenerator extends BaseGenerator {
 			sb.add("this.getFieldByName = proc(name:system.string):Dynamic = getFieldByNameInternal(this, name)");
 			sb.addNewLine(Same);
 			sb.add("this.setFieldByName = proc(name:system.string, value:Dynamic):void = setFieldByNameInternal(this, name, value)");
-			sb.addNewLine(Same);
-			sb.add("return toDynamic(this)");
 			sb.addBreak();
 		}
 

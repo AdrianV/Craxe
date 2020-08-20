@@ -7,4 +7,3 @@ develop_nim.hxml
 --main test.Main
 -D analyzer-optimize
 
--lib zlender

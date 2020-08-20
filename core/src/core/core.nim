@@ -8,8 +8,13 @@ type
     Hashable = concept x
        x.hash is proc():int
 
+    # Dynamic
+    DynamicType* = enum
+        THaxe, TString, TInt, TFloat, TAnonObject, TClass, TPointer
+
     # Main object for all haxe objects
-    HaxeObject* = RootObj
+    HaxeObject* = object of RootObj
+        kind*: DynamicType
 
     # Main object for all haxe referrence objects
     HaxeObjectRef* = ref HaxeObject
@@ -67,9 +72,9 @@ type
 
     # Dynamic object with access to fields by name
     DynamicHaxeObject* = object of HaxeObject
-        getFields*: proc():HaxeArray[string]
-        getFieldByName*: proc(name:string): Dynamic
-        setFieldByName*: proc(name:string, value:Dynamic):void
+        `getFields`*: proc():HaxeArray[string]
+        `getFieldByName`*: proc(name:string): Dynamic
+        `setFieldByName`*: proc(name:string, value:Dynamic):void
 
     DynamicHaxeObjectRef* = ref DynamicHaxeObject
 
@@ -79,12 +84,9 @@ type
 
     DynamicHaxeObjectProxyRef*[T] = ref object of DynamicHaxeObjectProxy[T]
 
-    # Dynamic
-    DynamicType* = enum
-        TString, TInt, TFloat, TAnonObject, TClass, TPointer
-
-    Dynamic* = ref object
+    Dynamic* = ref object of RootObj
         case kind*: DynamicType
+        of THaxe: discard
         of TString: 
             fstring*: system.string
         of TInt: 
@@ -384,7 +386,11 @@ template newDynamic*(value:float):Dynamic =
 template newDynamic*(value:AnonObject):Dynamic =
     Dynamic(kind:TAnonObject, fanon: value)
 
-template newDynamic*(value:DynamicHaxeObjectRef):Dynamic =
+template newDynamic*[T:DynamicHaxeObjectRef](value:T):Dynamic =
+    mixin makeDynamic
+    #let value = value
+    echo value.getFields == nil
+    if value.getFields == nil: makeDynamic(value)
     Dynamic(kind:TClass, fclass: value)
 
 proc newDynamic*(value:pointer):Dynamic =
@@ -418,24 +424,6 @@ proc `{}=`*[T](this:Dynamic, name:string, value: T) {.gcsafe.} =
         discard
 
 
-import macros
-
-macro `{}`*(f: untyped, name: static string): auto =
-    let xx = newDotExpr(f, newIdentNode(name))
-    return xx
-
-macro `{}=`*(f: untyped, name: static string, value: untyped): auto =
-    let x = quote do:
-        `f`.foobar = `value`
-    x[0][1] = newIdentNode(name)
-    return x
-
-#template `{}`* (this: untyped, name: static string): Dynamic =
-#    makeField(this, name)
-
-template `{}`* (this: untyped, name: string): Dynamic =
-    this.getFieldByName(name)
-
 proc getFieldNames*(this:Dynamic):HaxeArray[string] {.gcsafe.} =
     case this.kind
     of TAnonObject:
@@ -460,6 +448,8 @@ template call*[T](this:Dynamic, name:string, tp:typedesc[T], args:varargs[untype
     else:
         raise newException(ValueError, "Dynamic wrong type")
 
+converter toDynamic*[T: DynamicHaxeObjectRef](v:T): Dynamic {.inline.} = newDynamic(v)
+
 template toDynamic*(this:untyped):untyped =
     newDynamic(this)
 
@@ -480,7 +470,7 @@ proc fromDynamic*[T](this:Dynamic, t:typedesc[T]) : T =
             else: T.default
         of TClass:
             when T is DynamicHaxeObjectRef: 
-                echo this.fclass == nil
+                #echo this.fclass == nil
                 cast[T](this.fclass)
             elif T is DynamicHaxeObject:
                 if this.fclass != nil: cast[T](this.fclass) else: 
@@ -516,6 +506,8 @@ template toFloat* (v:SomeInteger): float = float(v)
 
 template toFloat*(v: Dynamic): float = v.fromDynamic(float)
 
+template toFloat*(v: float): float = v
+
 # --- Haxe Enum ---
 
 # Enum
@@ -541,3 +533,38 @@ proc rawClosure* [T: proc](prc: pointer, env: pointer): T {.noSideEffect, inline
 #    `closure`->ClE_0 = `env`;
 #    """.}
 #    closure
+
+import macros
+
+macro `{}`*(f: untyped, name: static string): auto =
+    let xn = ident(name)
+    let isdyn = ident("kind")
+    let x = quote do:
+        if `f`.`isdyn` == THaxe: `f`.`xn` else: fromDynamic(cast[Dynamic](`f`).fclass.getFieldByName(`name`), typeof `f`.`xn`) 
+    return x
+
+macro `{}=`* [T](f: untyped, name: static string, value: T) =
+    let xn = ident(name)
+    let isdyn = ident("kind")
+    let res = value.sameType(bindSym"int")
+    if res:
+        let xx = quote do:
+            block:
+                let v = `value`
+                if `f`.`isdyn` == THaxe: 
+                    `f`.`xn` = v.int32
+                else: 
+                    cast[Dynamic](`f`).fclass.setFieldByName(`name`, newDynamic(v)) 
+        return xx
+    else:
+        let xx = quote do:
+            block:
+                let v = `value`
+                if `f`.`isdyn` == THaxe: 
+                    `f`.`xn` = v
+                else: 
+                    cast[Dynamic](`f`).fclass.setFieldByName(`name`, newDynamic(v)) 
+        return xx
+
+template `{}`* (this: untyped, name: string): Dynamic =
+    this.getFieldByName(name)

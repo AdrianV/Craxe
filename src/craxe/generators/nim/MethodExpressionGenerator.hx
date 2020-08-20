@@ -669,7 +669,6 @@ class MethodExpressionGenerator {
 			}));
 		}
 
-		sb.add('makeDynamic(');
 		sb.add('${object.name}(');
 		for (i in 0...fields.length) {
 			var field = fields[i];
@@ -691,7 +690,7 @@ class MethodExpressionGenerator {
 			if (i + 1 < fields.length)
 				sb.add(", ");
 		}
-		sb.add('))');
+		sb.add(')');
 	}
 
 	/**

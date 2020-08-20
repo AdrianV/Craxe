@@ -95,12 +95,18 @@ class RecursiveNew {
     }
 }
 
+typedef SomeAnon = {a: Int, b: String};
+
 class Main {
 
 
 
     static function call() {
         trace('ok');
+    }
+
+    static function getSomeAnon(v: SomeAnon) {
+        
     }
 
     static function getAnAnon(v: {a: Int, b: String}) {
@@ -125,6 +131,8 @@ class Main {
         var v2 = {a: 4, b: "welt", c: 3.1415};
         getAnAnon(v2);
         trace(v2);
+        getSomeAnon(v);
+        getSomeAnon(v2);
     }
 
     static function testStringArray() {
