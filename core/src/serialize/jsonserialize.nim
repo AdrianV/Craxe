@@ -23,7 +23,7 @@ proc printObject(obj:Dynamic):string =
         let fieldName = fields[i]
         result.addQuoted(fieldName)
         result.add(": ")
-        let val = obj.getField(fieldName)
+        let val = obj{fieldName}
         case val.kind
         of TString:
             result.add("\"" & $val & "\"")
@@ -39,7 +39,7 @@ proc parseNode(node:JsonNode):Dynamic =
         var res = newAnonObject(keys)
         var i = 0        
         for key, val in node.fields.pairs():
-            res.setField(i, parseNode(val))
+            res{i} = parseNode(val)
             inc(i)
         return toDynamic(res)
     of JString:

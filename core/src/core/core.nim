@@ -1,6 +1,7 @@
 {.experimental: "codeReordering".}
 
 import tables
+import typetraits
 
 type
     # Objects that can calculate self hash
@@ -67,7 +68,7 @@ type
     # Dynamic object with access to fields by name
     DynamicHaxeObject* = object of HaxeObject
         getFields*: proc():HaxeArray[string]
-        getFieldByName*: proc(name:string):Dynamic
+        getFieldByName*: proc(name:string): Dynamic
         setFieldByName*: proc(name:string, value:Dynamic):void
 
     DynamicHaxeObjectRef* = ref DynamicHaxeObject
@@ -85,9 +86,9 @@ type
     Dynamic* = ref object
         case kind*: DynamicType
         of TString: 
-            fstring*:string
+            fstring*: system.string
         of TInt: 
-            fint*:int
+            fint*:int32
         of TFloat: 
             ffloat*:float
         of TAnonObject: 
@@ -124,14 +125,15 @@ proc bmmOperator*[T](val:var T):T {.discardable, inline.} =
     dec(val)
     result = val
 
-template `+`*(s:string, i:untyped): string =
-    s & $i
+when false:
+    template `+`*(s:string, i:untyped): string =
+        s & $i
 
-template `+`*(i:untyped, s:string): string =
-    $i & s
+    template `+`*(i:untyped, s:string): string =
+        $i & s
 
-template `+`*(s1:string, s2:string): string =
-    s1 & s2
+    template `+`*(s1:string, s2:string): string =
+        s1 & s2
 
 template toString*(this:untyped):string =
     $this
@@ -321,18 +323,18 @@ template newAnonObject*(fields: seq[AnonField]) : AnonObject =
 proc newAnonField*(name:string, value:Dynamic) : AnonField {.inline.} =
     AnonField(name : name, value : value)
 
-proc setField*[T](this:AnonObject, pos:int, value:T) {.inline.} =
+proc `{}=`*[T](this:AnonObject, pos:int, value:T) {.inline.} =
     this[pos].value = value
 
-proc setField*[T](this:AnonObject, name:string, value:T) {.inline.} =
+proc `{}=`*[T](this:AnonObject, name:string, value:T) {.inline.} =
     for fld in this:
         if fld.name == name:
             fld.value = value
 
-template getField*(this:AnonObject, pos:int):Dynamic =
+template `{}`*(this:AnonObject, pos:int):Dynamic =
     this[pos].value
 
-proc getField*(this:AnonObject, name:string):Dynamic =
+proc `{}`*(this:AnonObject, name:string):Dynamic =
     if this.len < 1:
         return nil
 
@@ -370,8 +372,11 @@ proc `$`*(this:Dynamic):string =
 template newDynamic*(value:string):Dynamic =
     Dynamic(kind:TString, fstring: value)
 
-template newDynamic*(value:int):Dynamic =
+template newDynamic*(value:int32):Dynamic =
     Dynamic(kind:TInt, fint: value)
+
+template newDynamic*(value:int):Dynamic =
+    Dynamic(kind:TInt, fint: value.int32)
 
 template newDynamic*(value:float):Dynamic =
     Dynamic(kind:TFloat, ffloat: value)
@@ -384,15 +389,52 @@ template newDynamic*(value:DynamicHaxeObjectRef):Dynamic =
 
 proc newDynamic*(value:pointer):Dynamic =
     Dynamic(kind:TPointer, fpointer: value)
-
-proc getField*(this:Dynamic, name:string):Dynamic {.gcsafe.} =    
+    
+proc `{}`*(this:Dynamic, name:string):Dynamic {.gcsafe.} =    
     case this.kind
     of TAnonObject:
-        getField(this.fanon, name)
+        this.fanon{name}
     of TClass:
         this.fclass.getFieldByName(name)
     else:
         nil
+
+proc `{}=`*(this:Dynamic, name:string, value: Dynamic) {.gcsafe.} =    
+    case this.kind
+    of TAnonObject:
+        this.fanon{name}=value
+    of TClass:
+        this.fclass.setFieldByName(name, value)
+    else:
+        discard
+
+proc `{}=`*[T](this:Dynamic, name:string, value: T) {.gcsafe.} =    
+    case this.kind
+    of TAnonObject:
+        this.fanon{name}=newDynamic(value)
+    of TClass:
+        this.fclass.setFieldByName(name, newDynamic(value))
+    else:
+        discard
+
+
+import macros
+
+macro `{}`*(f: untyped, name: static string): auto =
+    let xx = newDotExpr(f, newIdentNode(name))
+    return xx
+
+macro `{}=`*(f: untyped, name: static string, value: untyped): auto =
+    let x = quote do:
+        `f`.foobar = `value`
+    x[0][1] = newIdentNode(name)
+    return x
+
+#template `{}`* (this: untyped, name: static string): Dynamic =
+#    makeField(this, name)
+
+template `{}`* (this: untyped, name: string): Dynamic =
+    this.getFieldByName(name)
 
 proc getFieldNames*(this:Dynamic):HaxeArray[string] {.gcsafe.} =
     case this.kind
@@ -414,7 +456,7 @@ template call*[T](this:Dynamic, tp:typedesc[T], args:varargs[untyped]):untyped =
 template call*[T](this:Dynamic, name:string, tp:typedesc[T], args:varargs[untyped]):untyped =    
     case this.kind:
     of TAnonObject, TClass:
-        this.getField(name).call(tp, args)
+        this{name}.call(tp, args)
     else:
         raise newException(ValueError, "Dynamic wrong type")
 
@@ -424,15 +466,55 @@ template toDynamic*(this:untyped):untyped =
 proc fromDynamic*[T](this:Dynamic, t:typedesc[T]) : T =
     case this.kind
         of TInt:
-            cast[T](this.fint)
+            when T is int32: this.fint
+            elif T is float: this.fint.float
+            elif T is string: $this.fint
+            else: T.default
         of TString:
-            cast[T](this.fstring)
+            when T is string: this.fstring
+            else: T.default # $this
         of TFloat:
-            cast[T](this.ffloat)
+            when T is float: this.ffloat
+            elif T is int32: int32(this.ffloat)
+            elif T is string: $this.ffloat
+            else: T.default
         of TClass:
-            cast[T](this.fclass)
+            when T is DynamicHaxeObjectRef: 
+                echo this.fclass == nil
+                cast[T](this.fclass)
+            elif T is DynamicHaxeObject:
+                if this.fclass != nil: cast[T](this.fclass) else: 
+                    echo "null acces"
+                    T.default
+            else: 
+                echo "warning ", t.name
+                T.default
         else:
             raise newException(ValueError, "Dynamic wrong type")
+
+template declDynaimcBinOp(op) =
+    template op*[T:int32|float|int|string|bool](lhs: Dynamic, rhs:T): auto =
+        when T is int: op(lhs.fromDynamic(int32), rhs.int32)
+        else: op(lhs.fromDynamic(typeof T) , rhs)
+
+    template op*[T:int32|float|int|string|bool](lhs: T, rhs: Dynamic): auto =
+        when T is int: op(lhs.int32, rhs.fromDynamic(int32))
+        else: op(lhs, rhs.fromDynamic(typeof T))
+
+    template op*(lhs: Dynamic, rhs: Dynamic): Dynamic =
+        toDynamic(op(lhs.fromDynamic(float),rhs.fromDynamic(float)))
+
+declDynaimcBinOp(`*`)
+declDynaimcBinOp(`-`)
+declDynaimcBinOp(`/`)
+declDynaimcBinOp(`+`)
+declDynaimcBinOp(`and`)
+declDynaimcBinOp(`or`)
+declDynaimcBinOp(`&`)
+
+template toFloat* (v:SomeInteger): float = float(v)
+
+template toFloat*(v: Dynamic): float = v.fromDynamic(float)
 
 # --- Haxe Enum ---
 

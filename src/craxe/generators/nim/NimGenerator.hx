@@ -106,13 +106,18 @@ class NimGenerator extends BaseGenerator {
 	 *
 	 * 	proc someproc(arg1:int, arg2:float) =
 	 */
-	function generateFuncArguments(sb:IndentStringBuilder, args:Array<{v:TVar, value:Null<TypedExpr>}>) {
-		for (i in 0...args.length) {
-			var arg = args[i];
+	function generateFuncArguments(sb:IndentStringBuilder, args:Array<{v:TVar, value:Null<TypedExpr>}>) : Array<{i: Int, name: String}>
+	{
+		var anons = [];
+		for (i => arg in args) {
 			final name = MethodExpressionGenerator.scopes.createVar(arg.v, true);
-			sb.add(name);
-			sb.add(":");
-			sb.add(typeResolver.resolve(arg.v.t));
+			final tn = typeResolver.resolve(arg.v.t);
+			sb.add('$name: $tn');
+			switch arg.v.t {
+				case TAnonymous(a):
+					anons.push({i: i, name: name});
+				case _:
+			}
 			if (arg.value != null) switch arg.value.expr {
 				case null:
 				case TConst(c): 
@@ -123,6 +128,7 @@ class NimGenerator extends BaseGenerator {
 			if (i + 1 < args.length)
 				sb.add(", ");
 		}
+		return anons;
 	}
 
 	/**
@@ -647,16 +653,18 @@ class NimGenerator extends BaseGenerator {
 				}
 				final isPure = constructorIsPure(constrExp);
 				var sbCon = new IndentStringBuilder();
+				var sbArgs = new IndentStringBuilder();
+				var anons = generateFuncArguments(sbArgs, tfunc.args);
 				if (! isPure || supportsDynamic) {
 					// Generate constructor
 					MethodExpressionGenerator.scopes.newScope();
 					sbCon.add('proc new${className}${params}(');
-					generateFuncArguments(sbCon, tfunc.args);
+					sbCon.add(sbArgs.toString());
 					sbCon.add(') : ${className}${params} {.inline.}');
 					sb.add(sbCon.toString());
 				} else {
 					sb.add('template new${className}${params}(');
-					generateFuncArguments(sb, tfunc.args);
+					sb.add(sbArgs.toString());
 					sb.add(') : ${className}${params} =');
 					sb.addNewLine(Inc);
 					sb.add('${className}${params}(');
@@ -671,7 +679,7 @@ class NimGenerator extends BaseGenerator {
 				sb.add('proc init${className}${params}(this:${className}${params}');
 				if (tfunc.args.length > 0) {
 					sb.add(", ");
-					generateFuncArguments(sb, tfunc.args);
+					sb.add(sbArgs.toString());
 				}
 				sb.add(') =');
 				sb.addNewLine(Inc);
@@ -680,6 +688,8 @@ class NimGenerator extends BaseGenerator {
 					sb.add("this.hash = proc():int = this.hashCode()");
 					sb.addNewLine(Same);
 				}
+				methodBodyGenerator.generateShadowAnons(sb, anons);
+
 				generateMethodBody(sb, cls, constrExp);
 				sb.addNewLine(Dec);	
 				MethodExpressionGenerator.scopes.popScope();
@@ -726,15 +736,17 @@ class NimGenerator extends BaseGenerator {
 				MethodExpressionGenerator.scopes.newScope();
 				var clsName = !isStatic ? cls.classType.name : '${cls.classType.name}Static';
 				sb.add('proc ${method.name}(this:${clsName}');
+				var anons = null;
 				if (tfunc.args.length > 0) {
 					sb.add(", ");
-					generateFuncArguments(sb, tfunc.args);
+					anons = generateFuncArguments(sb, tfunc.args);
 				}
 				sb.add(") : ");
 				sb.add(typeResolver.resolve(ret));
 				sb.add(" =");
 				sb.addNewLine(Inc);
-
+				if (anons != null && anons.length > 0) 
+					methodBodyGenerator.generateShadowAnons(sb, anons);
 				generateMethodBody(sb, cls, expr, ret);
 				MethodExpressionGenerator.scopes.popScope();
 			case [v, _]:

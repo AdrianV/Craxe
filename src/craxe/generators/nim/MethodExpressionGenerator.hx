@@ -20,13 +20,18 @@ import craxe.common.ContextMacro;
 import craxe.common.tools.BinSearch;
 
 using craxe.common.ast.MetaHelper;
+using craxe.generators.nim.type.TypeResolver;
+
 using StringTools;
 
-enum FloatIntMix {
+enum TypeMix {
 	None;
 	FloatInt;
 	IntFloat;
 	FirstUInt;
+	FirstString;
+	SecondString;
+	StringString;
 }
 
 typedef VarInfo = {
@@ -57,8 +62,6 @@ abstract VarInScope(Array<Array<VarInfo>>) {
 
 	public function createVar(vr: TVar, _isParam: Bool): String {
 		var useName = NimNames.fixLocalVarName(vr.name);
-		if (useName == "arr")
-			trace(useName);
 		final last = this[this.length - 1];
 		var pos = finder.search(last, useName);
 		if (pos.found()) {
@@ -743,11 +746,19 @@ class MethodExpressionGenerator {
 			case _:
 				final fromType = typeResolver.resolve(fromExpr.t);
 				final toType = typeResolver.resolve(toExpr.t);
-				trace('cast $fromType to $toType');
+				//trace('cast $fromType to $toType');
 				sb.add('cast[$toType](');
 				generateInnerExpr();
 				sb.add(")");
 		}
+	}
+
+	public function generateShadowAnons(sb:IndentStringBuilder, anons: Array<{i: Int, name: String}>) {
+		return; // rethink optimzation
+		if (anons != null) for (d in anons) { // shadow and unpack anon objects
+			sb.add('var ${d.name} = ${d.name}.fromDynamic(DynamicHaxeObjectRef)');
+			sb.addNewLine(Same);
+		}		
 	}
 
 	/**
@@ -756,9 +767,19 @@ class MethodExpressionGenerator {
 	function generateTFunction(sb:IndentStringBuilder, func:TFunc) {
 		scopes.newScope();
 		var args = "";
+		var anons = [];
 		if (func.args.length > 0) {
 			var largs = [for (a in func.args) {name: scopes.createVar(a.v, true), t: a.v.t}];
-			args = largs.map(x -> '${x.name}:${typeResolver.resolve(x.t)}').join(", ");
+			for (i => x in largs) {
+				if (i > 0) args += ", ";
+				final tn = typeResolver.resolve(x.t);
+				args += '${x.name}:$tn';
+				switch x.t {
+					case TAnonymous(a):
+						anons.push({i:i, name: x.name});
+					case _:
+				}
+			}
 		}
 
 		sb.addNewLine(Inc);
@@ -770,6 +791,8 @@ class MethodExpressionGenerator {
 		sb.add(typeResolver.resolve(func.t));
 		sb.add(" = ");
 		sb.addNewLine(Inc);
+
+		generateShadowAnons(sb, anons);
 
 		switch (func.expr.expr) {
 			case TBlock(el):
@@ -899,44 +922,42 @@ class MethodExpressionGenerator {
 		}
 
 		if (needBrackets) sb.add("(");
-		final typMix: FloatIntMix  = switch op {
+		final typMix: TypeMix  = switch op {
 			case OpUShr: FirstUInt; 
-			case OpAdd | OpMult | OpDiv | OpSub | OpEq | OpNotEq | OpGt |
+			case OpAdd:
+				if (e1.t.isString()) {
+					if (e2.t.isString()) StringString
+					else FirstString;
+				} 
+				else if (e2.t.isString()) SecondString
+				else if (e1.t.isFloat() && e2.t.isInt()) FloatInt
+				else if (e1.t.isInt() && e2.t.isFloat()) IntFloat
+				else None;
+			case OpMult | OpDiv | OpSub | OpEq | OpNotEq | OpGt |
 				OpGte | OpLt | OpLte | OpMod | OpAssign:
-				switch [e1.t, e2.t] {
-					case [TInst(_.get().name => "Int", _), TInst(_.get().name => "Float", _)]:
-						IntFloat;
-					case [TInst(_.get().name => "Float", _), TInst(_.get().name => "Int", _)]:
-						FloatInt;
-					case [TAbstract(_.get().name => "Int", _), TAbstract(_.get().name => "Float", _)]:
-						IntFloat;
-					case [TAbstract(_.get().name => "Float", _), TAbstract(_.get().name => "Int", _)]:
-						FloatInt;
-					case [TAbstract(_.get().name => "Int", _), TInst(_.get().name => "Float", _)]:
-						IntFloat;
-					case [TAbstract(_.get().name => "Float", _), TInst(_.get().name => "Int", _)]:
-						FloatInt;
-					case [TInst(_.get().name => "Int", _), TAbstract(_.get().name => "Float", _)]:
-						IntFloat;
-					case [TInst(_.get().name => "Float", _), TAbstract(_.get().name => "Int", _)]:
-						FloatInt;
-					case [_,_]: None;
-				}
+				if (e1.t.isFloat() && e2.t.isInt()) FloatInt
+				else if (e1.t.isInt() && e2.t.isFloat()) IntFloat
+				else None;		
 			case _: None;
 		}
-		if (typMix.match(IntFloat)) sb.add("(");
+		switch typMix {
+			case IntFloat: sb.add("toFloat(");
+			case SecondString: sb.add("$(");
+			case _:
+		}
 		generateTBlockSingleExpression(sb, e1, false);
 		switch typMix {
-			case IntFloat:
-				sb.add(").float");
-			case FirstUInt:
-				sb.add(".uint");
+			case IntFloat | SecondString: sb.add(")");
+			case FirstUInt: sb.add(".uint");
 			case _:
 		}
 		sb.add(" ");
 		switch (op) {
 			case OpAdd:
-				sb.add("+");
+				switch typMix {
+					case FirstString | SecondString | StringString: sb.add("&");
+					case _: sb.add("+");
+				}
 			case OpMult:
 				sb.add("*");
 			case OpDiv:
@@ -991,7 +1012,11 @@ class MethodExpressionGenerator {
 			case OpIn:
 		}
 		sb.add(" ");
-		if (typMix.match(FloatInt)) sb.add("(");
+		switch typMix {
+			case FloatInt: sb.add("toFloat(");
+			case FirstString: sb.add("$(");
+			case _:
+		}
 		switch e2.expr {
 			case null:
 			case TBlock(el):
@@ -999,7 +1024,10 @@ class MethodExpressionGenerator {
 			case _:
 				generateTBlockSingleExpression(sb, e2, false);
 		}
-		if (typMix.match(FloatInt)) sb.add(").float");
+		switch typMix {
+			case FloatInt | FirstString: sb.add(")");
+			case _:
+		}
 		if (needBrackets) sb.add(")");
 	}
 
@@ -1151,7 +1179,7 @@ class MethodExpressionGenerator {
 			case FAnon(cf):
 				generateTCallTFieldFAnon(sb, cf.get());
 			case FDynamic(s):
-				sb.add('.getField("${s}")');
+				sb.add('{"${s}"}');
 			case v:
 				throw 'Unsupported ${v}';
 		}
@@ -1172,9 +1200,9 @@ class MethodExpressionGenerator {
 					sb.add('new${name}${ef.name}()');
 				case FAnon(cf):
 					var name = cf.get().name;
-					sb.add('.getField("${name}")');
+					sb.add('{"${name}"}');
 				case FDynamic(s):
-					sb.add('.getField("${s}")');
+					sb.add('{"${s}"}');
 				case v:
 					throw 'Unsupported ${v}';
 			}
@@ -1203,6 +1231,9 @@ class MethodExpressionGenerator {
 						generateTLocal(sb, v);
 						if (c != null)
 							generateTFieldFInstance(sb, c.c.get(), c.params, cf.get());
+					case FAnon(cf):
+						generateTLocal(sb, v);
+						genAccess();
 					case _:
 						generateTLocal(sb, v);
 				}
@@ -1708,7 +1739,9 @@ class MethodExpressionGenerator {
 				generateTNew(sb, c.get(), params, el);
 			case TEnumParameter(e1, ef, index):
 				if (!generateCustomEnumParameterCall(sb, e1, ef, index))
-					generateTEnumParameter(sb, e1, ef, index);				
+					generateTEnumParameter(sb, e1, ef, index);		
+			case TObjectDecl(fields):
+				generateTObjectDecl(sb, fields);		
 			case v:
 				throw 'Unsupported ${v}';
 		}

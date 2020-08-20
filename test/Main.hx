@@ -103,6 +103,30 @@ class Main {
         trace('ok');
     }
 
+    static function getAnAnon(v: {a: Int, b: String}) {
+        trace('a = ${v.a} b = ${v.b}');    
+        var factor: Int = 2;
+        var x = v.a * factor;
+        trace(x);
+        x = factor * v.a;
+        trace(x);
+        var factor: Float = 2.3;
+        var x = v.a * factor;
+        trace(x);
+        x = factor * v.a;
+        trace(x);
+        v.a = 2;
+    }
+    
+    static function testAnon() {
+        var v = {a: 3, b: "hallo"};
+        getAnAnon(v);
+        trace(v);
+        var v2 = {a: 4, b: "welt", c: 3.1415};
+        getAnAnon(v2);
+        trace(v2);
+    }
+
     static function testStringArray() {
         var arr: Array<String> = new Array();
         arr.push("foo");
@@ -177,5 +201,6 @@ class Main {
         trace(Sys.cpuTime());
         trace(Math.abs(-1));
         testStringArray();
+        testAnon();
     }
 }

@@ -32,9 +32,28 @@ class TypeResolver {
 	/**
 	 * Check type is simple by type name
 	 */
-	function isSimpleType(name:String):Bool {
+	static inline function isSimpleType(name:String):Bool {
 		return simpleTypes.exists(name);
 	}
+
+	static public inline function isInt(t: Type) 
+		return switch t {
+			case TInst(_.get().name => "Int", _) | TAbstract(_.get().name => "Int", _): true;
+			case _: false;
+		}
+
+	static public inline function isFloat(t: Type) 
+		return switch t {
+			case TInst(_.get().name => "Float", _) | TAbstract(_.get().name => "Float", _): true;
+			case _: false;
+		}
+
+	static public inline function isString(t: Type) 
+		return switch t {
+			case TInst(_.get().name => "String", _) | TAbstract(_.get().name => "String", _): true;
+			case _: false;
+		}
+
 
 	/**
 	 * Generate simple type
