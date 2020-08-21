@@ -352,6 +352,8 @@ class NimGenerator extends BaseGenerator {
 			sb.addNewLine(Same, true);
 			sb.add('${an.name}Wrapper = ref object of DynamicHaxeObject');
 			sb.addNewLine(Inc);
+			sb.add('instance: DynamicHaxeObjectRef');
+			sb.addNewLine(Same);
 			for (fld in an.fields) {
 				var ftp = typeResolver.resolve(fld.type);
 				sb.add('${fld.name}: ptr ${ftp}');
@@ -377,7 +379,7 @@ class NimGenerator extends BaseGenerator {
 
 			sb.add('converter to$anonName [T:DynamicHaxeObjectRef](v: T): $anonName {.inline} =');
 			sb.addNewLine(Inc);
-			sb.add('cast[$anonName](${anonName}Wrapper(kind: TAnonWrapper');
+			sb.add('cast[$anonName](${anonName}Wrapper(kind: TAnonWrapper, instance: v');
 			for (f in an.fields) {
 				sb.add(', ${f.name}: addr v.${f.name}');
 			}
