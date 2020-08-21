@@ -158,14 +158,7 @@ class TypeResolver {
 	 * Generate TAnonymous
 	 */
 	function generateTAnonymous(sb:StringBuf, anon:AnonType) {		
-		//sb.add("Dynamic");
-		var flds = anon.fields.map(x -> {
-			return {
-				name: x.name,
-				type: x.type
-			};
-		});
-		var object = context.getObjectTypeByFields(flds);		
+		final object = context.getObjectTypeByFields(anon.fields);		
 		sb.add(object.name);
 	}
 

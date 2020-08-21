@@ -2,6 +2,7 @@
 
 import tables
 import typetraits
+import strutils
 
 type
     # Objects that can calculate self hash
@@ -10,7 +11,7 @@ type
 
     # Dynamic
     DynamicType* = enum
-        THaxe, TString, TInt, TFloat, TAnonObject, TClass, TPointer
+        THaxe, TAnonWrapper, TString, TInt, TFloat, TAnonObject, TClass, TPointer
 
     # Main object for all haxe objects
     HaxeObject* = object of RootObj
@@ -86,7 +87,7 @@ type
 
     Dynamic* = ref object of RootObj
         case kind*: DynamicType
-        of THaxe: discard
+        of THaxe, TAnonWrapper: discard
         of TString: 
             fstring*: system.string
         of TInt: 
@@ -536,16 +537,22 @@ proc rawClosure* [T: proc](prc: pointer, env: pointer): T {.noSideEffect, inline
 
 import macros
 
-macro `{}`*(f: untyped, name: static string): auto =
+macro `{}`*(f: typed, name: static string): auto =
     let xn = ident(name)
     let isdyn = ident("kind")
+    let ft = getType(f)
+    var tn = ft[1].strVal
+    let ttn = ident(tn.substr(0, tn.find(":") - 1) & "Wrapper")
     let x = quote do:
-        if `f`.`isdyn` == THaxe: `f`.`xn` else: fromDynamic(cast[Dynamic](`f`).fclass.getFieldByName(`name`), typeof `f`.`xn`) 
+        if `f`.`isdyn` == THaxe: `f`.`xn` else: cast[`ttn`](`f`).`xn`[] 
     return x
 
-macro `{}=`* [T](f: untyped, name: static string, value: T) =
+macro `{}=`* [T](f: typed, name: static string, value: T) =
     let xn = ident(name)
     let isdyn = ident("kind")
+    let ft = getType(f)
+    var tn = ft[1].strVal
+    let ttn = ident(tn.substr(0, tn.find(":") - 1) & "Wrapper")
     let res = value.sameType(bindSym"int")
     if res:
         let xx = quote do:
@@ -554,7 +561,7 @@ macro `{}=`* [T](f: untyped, name: static string, value: T) =
                 if `f`.`isdyn` == THaxe: 
                     `f`.`xn` = v.int32
                 else: 
-                    cast[Dynamic](`f`).fclass.setFieldByName(`name`, newDynamic(v)) 
+                    cast[`ttn`](`f`).`xn`[] = v.int32
         return xx
     else:
         let xx = quote do:
@@ -563,7 +570,7 @@ macro `{}=`* [T](f: untyped, name: static string, value: T) =
                 if `f`.`isdyn` == THaxe: 
                     `f`.`xn` = v
                 else: 
-                    cast[Dynamic](`f`).fclass.setFieldByName(`name`, newDynamic(v)) 
+                    cast[`ttn`](`f`).`xn`[] = v
         return xx
 
 template `{}`* (this: untyped, name: string): Dynamic =

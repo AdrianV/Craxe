@@ -669,10 +669,9 @@ class MethodExpressionGenerator {
 			}));
 		}
 
-		sb.add('${object.name}(');
-		for (i in 0...fields.length) {
-			var field = fields[i];
-			sb.add('${field.name}: ');
+		sb.add('${object.name}(kind: THaxe');
+		for (field in fields) {
+			sb.add(', ${field.name}: ');
 			switch field.expr.expr {
 				case TConst(c):
 					generateTConst(sb, c);
@@ -687,8 +686,6 @@ class MethodExpressionGenerator {
 				case v:
 					throw 'Unsupported ${v}';
 			}
-			if (i + 1 < fields.length)
-				sb.add(", ");
 		}
 		sb.add(')');
 	}

@@ -350,6 +350,15 @@ class NimGenerator extends BaseGenerator {
 			}
 			sb.addNewLine(Dec);
 			sb.addNewLine(Same, true);
+			sb.add('${an.name}Wrapper = ref object of DynamicHaxeObject');
+			sb.addNewLine(Inc);
+			for (fld in an.fields) {
+				var ftp = typeResolver.resolve(fld.type);
+				sb.add('${fld.name}: ptr ${ftp}');
+				sb.addNewLine(Same);
+			}
+			sb.addNewLine(Dec);
+			sb.addNewLine(Same, true);
 		}
 
 		sb.addNewLine();
@@ -365,6 +374,15 @@ class NimGenerator extends BaseGenerator {
 
 		for (an in anons) {
 			var anonName = an.name;
+
+			sb.add('converter to$anonName [T:DynamicHaxeObjectRef](v: T): $anonName {.inline} =');
+			sb.addNewLine(Inc);
+			sb.add('cast[$anonName](${anonName}Wrapper(kind: TAnonWrapper');
+			for (f in an.fields) {
+				sb.add(', ${f.name}: addr v.${f.name}');
+			}
+			sb.add("))");
+			sb.addBreak();
 
 			sb.add('proc getFields(this:${anonName}):HaxeArray[system.string] {.inline.} =');
 			sb.addNewLine(Inc);
