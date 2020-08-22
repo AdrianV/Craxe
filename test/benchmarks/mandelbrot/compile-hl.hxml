@@ -14,5 +14,6 @@
 --main Mandelbrot
 -hl bin/hl_anon/mandelbrot.c
 -D anon_objects
+-D anon_fair
 
 # cl.exe /Ox -I C:/GitHub/hl/src -I . mandelbrot.c C:/GitHub/hl/Release/libhl.lib

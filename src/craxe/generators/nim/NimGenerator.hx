@@ -222,7 +222,7 @@ class NimGenerator extends BaseGenerator {
 		var enumName = '${enumInfo.enumType.name}${constr.name}';
 		sb.add('proc `$`(this: ${enumName}) : system.string {.inline.} =');
 		sb.addNewLine(Inc);
-		sb.add("result = $this[]");
+		sb.add("return $this[]");
 		sb.addBreak();
 
 		sb.add('proc `==`(e1:${enumName}, e2:${enumName}) : bool {.inline.} =');
@@ -685,7 +685,7 @@ class NimGenerator extends BaseGenerator {
 					sb.add(sbArgs.toString());
 					sb.add(') : ${className}${params} =');
 					sb.addNewLine(Inc);
-					sb.add('${className}${params}(');
+					sb.add('${className}${params}(kind: THaxe, ');
 					buildPureConstructor(sb, constrExp);
 					sb.add(")");
 					sb.addNewLine(Dec);
@@ -843,7 +843,7 @@ class NimGenerator extends BaseGenerator {
 				var clsName = cls.classType.name;
 				sb.add('proc `$`(this:${clsName}) : system.string {.inline.} = ');
 				sb.addNewLine(Inc);
-				sb.add('result = "${clsName}"' + " & $this[]");
+				sb.add('return "${clsName}"' + " & $this[]");
 				sb.addBreak();
 			case KAbstractImpl(_):
 			case v:

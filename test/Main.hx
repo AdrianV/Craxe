@@ -105,8 +105,9 @@ class Main {
         trace('ok');
     }
 
-    static function getSomeAnon(v: SomeAnon) {
-        
+    static function getOtherAnon(v: {c: Float}) {
+        trace(v);
+        v.c = 2.7;
     }
 
     static function getAnAnon(v: {a: Int, b: String}) {
@@ -131,8 +132,8 @@ class Main {
         var v2 = {a: 4, b: "welt", c: 3.1415};
         getAnAnon(v2);
         trace(v2);
-        getSomeAnon(v);
-        getSomeAnon(v2);
+        getOtherAnon(v2);
+        getOtherAnon({c: 1.3});
     }
 
     static function testStringArray() {

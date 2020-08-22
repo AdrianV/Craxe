@@ -131,7 +131,7 @@ class Mandelbrot
 
 
    #if anon_objects
-   public static function createComplex(inI:Float, inJ:Float) return @:fixed { i:inI, j:inJ };
+   #if (anon_fair) inline #end public static function createComplex(inI:Float, inJ:Float) return @:fixed { i:inI, j:inJ };
    #else
    inline public static function createComplex(inI:Float, inJ:Float) return new Complex(inI, inJ);
    #end

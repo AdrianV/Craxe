@@ -1,9 +1,11 @@
+-D analyzer-optimize
+--dce full
 --main Mandelbrot
 --macro craxe.Generator.generate()
---no-output
+#--no-output
 -D nim
 -D nim-speed=fastest
--D nim-gc=arc
+-D nim-gc=orc
 -D eval-stack
 -lib craxe
 --each

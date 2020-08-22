@@ -223,36 +223,42 @@ template valueBlock*(body : untyped) : untyped =
 
 template newHaxeArray*[T](): HaxeArray[T] = HaxeArray[T]()
     
-template `[]`*[T](this:HaxeArray[T], pos:Natural):T =
-    #let this = this
-    if pos >= 0 and pos < this.data.len: this.data[pos] else: T.default
+template `[]`*[T](this:HaxeArray[T], pos:Natural): T =
+    block:
+        let data = addr this.data
+        let x = pos
+        if x >= 0 and x < data[].len: data[][x] else: T.default
     
-template get*[T](this:HaxeArray[T], pos:Natural):T =
-    #let this = this
-    if pos == 437504: echo this.data.len
-    if pos >= 0 and pos < this.data.len: this.data[pos] else: T.default
+template get*[T](this:HaxeArray[T], pos:Natural):auto =
+    block:
+        let data = addr this.data
+        let x = pos
+        if x >= 0 and x < data[].len: data[][x] else: T.default
 
-template `[]=`*[T](this:var HaxeArray[T], pos:Natural, v: T) =
-    if pos >= 0 :
-        if pos >= this.data.len: setLen(this.data, pos + 1)
-        this.data[pos] = v
+template `[]=`*[T](this:HaxeArray[T], pos:Natural, v: T) =
+    block:
+        let x = pos
+        if x >= 0 :
+            var data = addr this.data
+            if x >= data[].len: setLen(data[], x + 1)
+            data[][x] = v
 
-template set* [T] (this:var HaxeArray[T], pos:Natural, v: T) =
-    if pos >= 0 :
-        if pos == 437504: echo this.data.len
-        if pos >= this.data.len: setLen(this.data, pos + 1)
-        this.data[pos] = v
+template set* [T] (this:HaxeArray[T], pos:Natural, v: T) =
+    block:
+        let x = pos
+        if x >= 0 :
+            var data = addr this.data
+            if x >= data[].len: setLen(data[], x + 1)
+            data[][x] = v
 
     
 template push*[T](this:HaxeArray[T], value:T):int32 =
-    this.data.add(value)
-    len(this.data).int32
+    block:
+        let data = addr this.data
+        data[].add(value)
+        len(data[]).int32
 
-template pop*[T](this:HaxeArray[T]): T =
-    let last = this.data.len - 1
-    let res = this.data[last]
-    delete(this.data, last)
-    res
+template pop*[T](this:var HaxeArray[T]): T = this.data.pop()
 
 #template get*[T](this:HaxeArray[T], pos:int): T =
 #    this.data[pos]
@@ -389,9 +395,7 @@ template newDynamic*(value:AnonObject):Dynamic =
 
 template newDynamic*[T:DynamicHaxeObjectRef](value:T):Dynamic =
     mixin makeDynamic
-    #let value = value
-    echo value.getFields == nil
-    if value.getFields == nil: makeDynamic(value)
+    if value.getFields.isNil: makeDynamic(value)
     Dynamic(kind:TClass, fclass: value)
 
 proc newDynamic*(value:pointer):Dynamic =

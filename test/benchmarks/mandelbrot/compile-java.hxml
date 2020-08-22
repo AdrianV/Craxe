@@ -5,3 +5,4 @@
 --main Mandelbrot
 -java bin/java-anon
 -D anon_objects
+-D anon_fair

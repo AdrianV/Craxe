@@ -41,3 +41,4 @@ build.hxml
 -D nim-out=./bin/nim/main.nim
 -D nim-dynamic=enable
 -D eval-stack
+-D nim-gc=arc

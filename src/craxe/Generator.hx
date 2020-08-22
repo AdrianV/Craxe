@@ -23,29 +23,18 @@ class Generator {
 	 * Callback on generating code from context
 	 */
 	public static function onGenerate(types:Array<Type>):Void {
+		haxe.macro.Context.onAfterGenerate(() -> {
+			run(types);
+		});
+	}
+
+	static function run(types:Array<Type>) {
 		var preprocessor = new CommonAstPreprocessor();
 		var builder:BaseGenerator = null;
 		var compiler:BaseCompiler = null;
 
 		var processed = preprocessor.process(types);
 		var classes = processed.classes;
-		#if (false)
-		haxe.macro.Context.onAfterGenerate(() -> {
-			if (classes != null) {
-				for (c in classes) {
-					final m = c.classType.name;
-					try {
-						final all = haxe.macro.Context.getModule(m);
-						trace('module $m data: ${all.length}');
-					} catch (e) {
-						trace('module $m not found');
-					}
-				}
-	
-			}
-		});
-		#end
-
 		Log.trace = (v:Dynamic, ?infos:PosInfos) -> {			
 			var str = Std.string(v);
 			if (infos == null)
@@ -65,6 +54,6 @@ class Generator {
 			throw "Not supported builder type";
 
 		builder.build();
-		compiler.compile();
+		compiler.compile();		
 	}
 }

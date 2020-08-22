@@ -7,3 +7,4 @@
 -cpp bin/Mandelbrot-anon.cppia
 -D cppia
 -D anon_objects
+-D anon_fair

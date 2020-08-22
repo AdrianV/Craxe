@@ -5,3 +5,5 @@
 --main Mandelbrot
 -php bin/php-anon
 -D anon_objects
+-D anon_fair
+

@@ -5,3 +5,4 @@
 --main Mandelbrot
 -js bin/Mandelbrot-anon.js
 -D anon_objects
+-D anon_fair

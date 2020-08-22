@@ -5,3 +5,4 @@
 --main Mandelbrot
 --interp
 -D anon_objects
+-D anon_fair
