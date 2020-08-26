@@ -112,6 +112,13 @@ class Main {
         dyn.c = 47.11;
         getOtherAnon(dyn);
         trace(dyn);
+        dyn.c = "foo";
+        try {
+            getOtherAnon(dyn);
+            trace("ERROR we should never reach here");
+        } catch (e) {
+            trace(e);
+        }
     }
 
 

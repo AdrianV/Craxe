@@ -124,6 +124,8 @@ type
     HaxeEnum* = ref object of HaxeObject
         index*:int
 
+    NullAccess* = object of CatchableError
+
 # Core procedures
 # a++
 proc apOperator*[T](val:var T):T {.discardable, inline.} =        
@@ -459,7 +461,10 @@ template newDynamic*[T:DynamicHaxeObjectRef](value:T):Dynamic =
 
 proc newDynamic*(value:pointer):Dynamic =
     Dynamic(kind:TPointer, fpointer: value)
-    
+
+template newDynamic*(value:ref Exception):Dynamic =
+    Dynamic(kind:TString, fstring: value.msg)
+
 proc `{}`*(this:Dynamic, name:string):Dynamic {.gcsafe.} =    
     case this.kind
     of TAnonObject:
@@ -681,8 +686,21 @@ proc adr* [T](this: DynamicHaxeObjectRef, name:string): ptr T =
             of TBool:    
                 when T is bool: return cast[ptr bool](addr f[].fdynamic.fbool)
             else: discard
-        else: return cast[ptr T](f[].fstatic)
-    return nil
+        of atStaticBool:
+            when T is bool: return cast[ptr T](f[].fstatic)
+        of atStaticInt:
+            when T is int32: return cast[ptr T](f[].fstatic)
+        of atStaticFloat:
+            when T is float: return cast[ptr T](f[].fstatic)
+        of atStaticString:
+            when T is string: return cast[ptr T](f[].fstatic)
+        of atStaticAnon:
+            when T is DynamicHaxeObjectRef: return cast[ptr T](f[].fstatic)
+        of atStaticArray:
+            when T is HaxeArray: return cast[ptr T](f[].fstatic)
+        of atStaticInstance:
+            when T is HaxeObjectRef: return cast[ptr T](f[].fstatic)
+    raise newException(NullAccess, "anon has no field " & name & " of type " & T.name)
 
 proc fromField* [T](field: var T): AnonNextGen =
     when T is bool: AnonNextGen(fanonType: atStaticBool, fstatic: addr field)
