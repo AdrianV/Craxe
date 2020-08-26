@@ -377,58 +377,54 @@ class NimGenerator extends BaseGenerator {
 		for (an in anons) {
 			var anonName = an.name;
 
-			sb.add('converter to$anonName [T:DynamicHaxeObjectRef](v: T): $anonName {.inline} =');
+			sb.add('converter to$anonName* [T:DynamicHaxeObjectRef](v: T): $anonName {.inline} =');
 			sb.addNewLine(Inc);
-			sb.add('cast[$anonName](${anonName}Wrapper(kind: TAnonWrapper, instance: v');
+			sb.add('cast[$anonName](${anonName}Wrapper(kind: TAnonWrapper, fields: v.fields, instance: v');
+			var first = true;
 			for (f in an.fields) {
+				if (first)
+					sb.addNewLine(Inc);
+				else
+					sb.addNewLine(Same);
 				sb.add(', ${f.name}: addr v.${f.name}');
+				first = false;
 			}
+			if (!first) sb.addNewLine(Dec);
 			sb.add("))");
-			sb.addBreak();
-
-			sb.add('proc getFields(this:${anonName}):HaxeArray[system.string] {.inline.} =');
-			sb.addNewLine(Inc);
-			var fldNames = an.fields.map(x -> '"${x.name}"').join(", ");
-			sb.add('return HaxeArray[system.string](data: @[${fldNames}])');
 
 			sb.addBreak();
 
-			sb.add('proc getFieldByNameInternal(this:${anonName}, name:system.string):Dynamic =');
+			sb.add('converter to$anonName* (v: Dynamic): $anonName =');
 			sb.addNewLine(Inc);
-			if (an.fields.length > 0) {
-				sb.add("case name");
-				sb.addNewLine(Same);
-				for (i in 0...an.fields.length) {
-					var fld = an.fields[i];
-					sb.add('of "${fld.name}": return toDynamic(this.${fld.name})');
+			sb.add('case v.kind:');
+			sb.addNewLine(Same);
+			sb.add('of TClass:');
+			sb.addNewLine(Inc);
+			sb.add('cast[$anonName](${anonName}Wrapper(kind: TAnonWrapper, fields: v.fclass.fields, instance: v.fclass');
+			var first = true;
+			for (f in an.fields) {
+				if (first)
+					sb.addNewLine(Inc);
+				else
 					sb.addNewLine(Same);
-				}
+				final tn = typeResolver.resolve(f.type);
+				sb.add(', ${f.name}: adr[$tn](v.fclass, "${f.name}")');
+				first = false;
 			}
-
-			sb.addBreak();
-
-			sb.add('proc setFieldByNameInternal(this:${anonName}, name:system.string, value:Dynamic):void =');
-			sb.addNewLine(Inc);
-			if (an.fields.length > 0) {
-				sb.add("case name");
-				sb.addNewLine(Same);
-				for (i in 0...an.fields.length) {
-					var fld = an.fields[i];
-					sb.add('of "${fld.name}": this.${fld.name} = fromDynamic(value, typeof(this.${fld.name}))');
-					sb.addNewLine(Same);
-				}
-			}
-
+			if (!first) sb.addNewLine(Dec);
+			sb.add("))");
+			sb.addNewLine(Dec);
+			sb.add('else: raise newException(ValueError, "not an anon")');		
 			sb.addBreak();
 
 			sb.add('proc makeDynamic(this:${anonName}) =');
 			sb.addNewLine(Inc);
-
-			sb.add("this.getFields = proc():HaxeArray[system.string] = getFields(this)");
-			sb.addNewLine(Same);
-			sb.add("this.getFieldByName = proc(name:system.string):Dynamic = getFieldByNameInternal(this, name)");
-			sb.addNewLine(Same);
-			sb.add("this.setFieldByName = proc(name:system.string, value:Dynamic):void = setFieldByNameInternal(this, name, value)");
+			if (an.fields.length > 0) {
+				for (fld in an.fields) {
+					sb.add('this.fields.insert("${fld.name}", fromField(this.${fld.name}))');
+					sb.addNewLine(Same);
+				}
+			} else sb.add("discard");
 			sb.addBreak();
 		}
 

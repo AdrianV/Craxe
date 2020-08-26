@@ -99,6 +99,20 @@ typedef SomeAnon = {a: Int, b: String};
 
 class Main {
 
+    static function testAnon() {
+        var v = {a: 3, b: "hallo"};
+        getAnAnon(v);
+        trace(v);
+        var v2 = {a: 4, b: "welt", c: 3.1415};
+        getAnAnon(v2);
+        trace(v2);
+        getOtherAnon(v2);
+        getOtherAnon({c: 1.3});
+        var dyn: Dynamic = {};
+        dyn.c = 47.11;
+        getOtherAnon(dyn);
+        trace(dyn);
+    }
 
 
     static function call() {
@@ -125,17 +139,6 @@ class Main {
         v.a = 2;
     }
     
-    static function testAnon() {
-        var v = {a: 3, b: "hallo"};
-        getAnAnon(v);
-        trace(v);
-        var v2 = {a: 4, b: "welt", c: 3.1415};
-        getAnAnon(v2);
-        trace(v2);
-        getOtherAnon(v2);
-        getOtherAnon({c: 1.3});
-    }
-
     static function testStringArray() {
         var arr: Array<String> = new Array();
         arr.push("foo");

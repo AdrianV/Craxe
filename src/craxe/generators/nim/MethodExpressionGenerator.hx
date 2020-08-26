@@ -1227,7 +1227,7 @@ class MethodExpressionGenerator {
 						generateTLocal(sb, v);
 						if (c != null)
 							generateTFieldFInstance(sb, c.c.get(), c.params, cf.get());
-					case FAnon(cf):
+					case FAnon(_) | FDynamic(_):
 						generateTLocal(sb, v);
 						genAccess();
 					case _:

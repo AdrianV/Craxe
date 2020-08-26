@@ -8,6 +8,10 @@ template trace*(this:LogStatic, v:byte, e:varargs[string, `$`]):void =
     write(stdout, e[0] & " " & e[1] & ": ")
     echo cast[int](v)
 
-template trace*(this:LogStatic, v:untyped, e:varargs[string, `$`]):void =
+template trace*(this:LogStatic, v:typed, e:varargs[string, `$`]):void =
+    mixin toDynamic
     write(stdout, e[0] & " " & e[1] & ": ")
-    echo v
+    when compiles($v):
+        echo v
+    else:
+        echo $toDynamic(v)

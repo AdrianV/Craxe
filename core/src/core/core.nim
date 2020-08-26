@@ -3,6 +3,9 @@
 import tables
 import typetraits
 import strutils
+import tools.tokenhash
+
+export tokenhash
 
 type
     # Objects that can calculate self hash
@@ -11,7 +14,21 @@ type
 
     # Dynamic
     DynamicType* = enum
-        THaxe, TAnonWrapper, TString, TInt, TFloat, TAnonObject, TClass, TPointer
+        THaxe, TAnonWrapper, TString, TInt, TFloat, TBool, TAnonObject, TClass, TPointer
+
+    # --- AnonNextGen ---
+
+    AnonNextGenType* = enum
+        atStaticBool, atStaticInt, atStaticFloat, atStaticString, atStaticArray, atStaticAnon, atStaticInstance, atDynamic
+
+    AnonNextGen* = object
+        case fanonType*: AnonNextGenType
+        of atStaticBool, atStaticInt, atStaticFloat, atStaticString, atStaticArray, atStaticAnon, atStaticInstance:
+            fstatic*: pointer
+        of atDynamic:
+            fdynamic*: Dynamic
+
+    FieldTable* = TokenTable[AnonNextGen]
 
     # Main object for all haxe objects
     HaxeObject* = object of RootObj
@@ -73,9 +90,7 @@ type
 
     # Dynamic object with access to fields by name
     DynamicHaxeObject* = object of HaxeObject
-        `getFields`*: proc():HaxeArray[string]
-        `getFieldByName`*: proc(name:string): Dynamic
-        `setFieldByName`*: proc(name:string, value:Dynamic):void
+        fields*: FieldTable
 
     DynamicHaxeObjectRef* = ref DynamicHaxeObject
 
@@ -85,7 +100,7 @@ type
 
     DynamicHaxeObjectProxyRef*[T] = ref object of DynamicHaxeObjectProxy[T]
 
-    Dynamic* = ref object of RootObj
+    Dynamic* = ref object 
         case kind*: DynamicType
         of THaxe, TAnonWrapper: discard
         of TString: 
@@ -94,6 +109,8 @@ type
             fint*:int32
         of TFloat: 
             ffloat*:float
+        of TBool:
+            fbool*: bool
         of TAnonObject: 
             fanon*: AnonObject
         of TClass: 
@@ -358,25 +375,68 @@ proc getFields*(this:AnonObject):HaxeArray[string] =
     for f in this:
         discard result.push(f.name)
 
+proc getFields* (this: DynamicHaxeObjectRef): HaxeArray[string] =
+    result = HaxeArray[string]()
+    for f in this.fields:
+        discard result.push($f.thash)
+
+proc getFieldByName* (this: DynamicHaxeObjectRef, name:string): Dynamic 
+
+proc setFieldByName* (this: DynamicHaxeObjectRef, name:string, value:Dynamic):void 
+
+template checkDynamic*[T:DynamicHaxeObjectRef](value:T) =
+    mixin makeDynamic
+    if value.fields.len == 0: makeDynamic(value)
+
+template toDynamic*(f: AnonNextGen): Dynamic =
+    case f.fanonType :
+    of atStaticBool: Dynamic(kind: TBool, fbool: cast[ptr bool](f.fstatic)[])
+    of atStaticInt: Dynamic(kind: TInt, fint: cast[ptr int32](f.fstatic)[])
+    of atStaticFloat: Dynamic(kind: TFloat, ffloat: cast[ptr float](f.fstatic)[])
+    of atStaticString: Dynamic(kind: TString, fstring: cast[ptr string](f.fstatic)[])
+    of atStaticArray: nil # TODO 
+    of atStaticAnon: Dynamic(kind: TClass, fclass: cast[ptr DynamicHaxeObjectRef](f.fstatic)[])
+    of atStaticInstance: nil # TODO
+    of atDynamic: f.fdynamic
+
+proc toString[T:DynamicHaxeObjectRef](this:T): string
+
+template `$`*[T:DynamicHaxeObjectRef](this:T): string =
+    checkDynamic(this)
+    toString(this)
+
 # Dynamic 
+    
 proc `$`*(this:Dynamic):string =
-    case this.kind
-    of TString:
-        return this.fstring
-    of TInt:
-        return $this.fint
-    of TFloat:
-        return $this.ffloat
-    of TAnonObject:
-        return $this[]
-    of TClass:
-        let fields = this.fclass.getFields()
-        var data = newSeq[string]()
-        for fld in fields.data:
-            data.add(fld & ": " & $this.fclass.getFieldByName(fld))
-        return $data
-    else:
-        return "Dynamic unknown"
+    if not this.isNil:
+        case this.kind
+        of TString:
+            this.fstring
+        of TInt:
+            $this.fint
+        of TFloat:
+            $this.ffloat
+        of TBool:
+            $this.fbool
+        of TAnonObject:
+            $this[]
+        of TClass:
+            toString(this.fclass)
+        else:
+            "Dynamic unknown"
+    else: "null"
+
+proc toString[T:DynamicHaxeObjectRef](this:T): string =
+    var isFirst = true
+    result = "{"
+    for f in this.fields:
+        if not isFirst: result &= ", "
+        result &= $f.thash & ": " & $f.data.toDynamic
+        isFirst = false
+    result &= "}"
+
+template newDynamic*(value:bool):Dynamic =
+    Dynamic(kind:TBool, fbool: value)
 
 template newDynamic*(value:string):Dynamic =
     Dynamic(kind:TString, fstring: value)
@@ -394,8 +454,7 @@ template newDynamic*(value:AnonObject):Dynamic =
     Dynamic(kind:TAnonObject, fanon: value)
 
 template newDynamic*[T:DynamicHaxeObjectRef](value:T):Dynamic =
-    mixin makeDynamic
-    if value.getFields.isNil: makeDynamic(value)
+    checkDynamic(value)
     Dynamic(kind:TClass, fclass: value)
 
 proc newDynamic*(value:pointer):Dynamic =
@@ -464,14 +523,23 @@ proc fromDynamic*[T](this:Dynamic, t:typedesc[T]) : T =
             when T is int32: this.fint
             elif T is float: this.fint.float
             elif T is string: $this.fint
+            elif T is bool: this.fint > 0
             else: T.default
         of TString:
             when T is string: this.fstring
+            elif T is bool: this.fstring == "true"
             else: T.default # $this
         of TFloat:
             when T is float: this.ffloat
             elif T is int32: int32(this.ffloat)
             elif T is string: $this.ffloat
+            elif T is bool: this.ffloat > 0
+            else: T.default
+        of TBool:
+            when T is bool: this.fbool
+            elif T is int32: ord(this.fbool).int32
+            elif T is float: ord(this.fbool).float
+            elif T is string: (if this.fbool: "true" else: "false")
             else: T.default
         of TClass:
             when T is DynamicHaxeObjectRef: 
@@ -579,3 +647,49 @@ macro `{}=`* [T](f: typed, name: static string, value: T) =
 
 template `{}`* (this: untyped, name: string): Dynamic =
     this.getFieldByName(name)
+
+proc getFieldByName* (this: DynamicHaxeObjectRef, name:string): Dynamic =
+    let f = this.fields.get(name)
+    if f != nil :
+        return f[].toDynamic
+    
+proc setFieldByName* (this: DynamicHaxeObjectRef, name:string, value:Dynamic):void = 
+    let f = this.fields.setOrInsert(name, AnonNextGen(fanonType: atDynamic, fdynamic: value))
+    if f != nil :
+        case f[].fanonType :
+        of atStaticBool: cast[ptr bool](f[].fstatic)[] = fromDynamic(value, bool)
+        of atStaticInt: cast[ptr int32](f[].fstatic)[] = fromDynamic(value, int32)
+        of atStaticFloat: cast[ptr float](f[].fstatic)[] = fromDynamic(value, float)
+        of atStaticString: cast[ptr string](f[].fstatic)[] = fromDynamic(value, string)
+        of atStaticArray: discard # TODO 
+        of atStaticAnon: cast[ptr DynamicHaxeObjectRef](f[].fstatic)[] = fromDynamic(value, DynamicHaxeObjectRef)
+        of atStaticInstance: discard # TODO
+        of atDynamic: f[].fdynamic = value
+
+proc adr* [T](this: DynamicHaxeObjectRef, name:string): ptr T = 
+    let f = this.fields.get(name)
+    if f != nil :
+        case f[].fanonType:
+        of atDynamic: 
+            case f[].fdynamic.kind:
+            of TInt: 
+                when T is int32: return cast[ptr int32](addr f[].fdynamic.fint)
+            of TFloat:    
+                when T is float: return cast[ptr float](addr f[].fdynamic.ffloat)
+            of TString:    
+                when T is string: return cast[ptr string](addr f[].fdynamic.fstring)
+            of TBool:    
+                when T is bool: return cast[ptr bool](addr f[].fdynamic.fbool)
+            else: discard
+        else: return cast[ptr T](f[].fstatic)
+    return nil
+
+proc fromField* [T](field: var T): AnonNextGen =
+    when T is bool: AnonNextGen(fanonType: atStaticBool, fstatic: addr field)
+    elif T is int32: AnonNextGen(fanonType: atStaticInt, fstatic: addr field)
+    elif T is float: AnonNextGen(fanonType: atStaticFloat, fstatic: addr field)
+    elif T is string: AnonNextGen(fanonType: atStaticString, fstatic: addr field)
+    elif T is HaxeArray: AnonNextGen(fanonType: atStaticArray, fstatic: addr field)
+    elif T is DynamicHaxeObjectRef: AnonNextGen(fanonType: atStaticAnon, fstatic: addr field)
+    elif T is Dynamic: AnonNextGen(fanonType: atDynamic, fdynamic: field)
+    elif T is HaxeObjectRef: AnonNextGen(fanonType: atStaticInstance, fstatic: addr field)
