@@ -95,9 +95,29 @@ class RecursiveNew {
     }
 }
 
+class SomeGeneric<T> {
+    final data: T;
+
+    public function new(data: T) {
+        this.data = data;
+    }
+}
+
 typedef SomeAnon = {a: Int, b: String};
 
 class Main {
+
+    static function testGeneric() {
+        var x = new SomeGeneric("Hi Nim");
+        trace(x);    
+    }
+
+    static function testAandB() {
+        var a = new test.a.Foo();
+        a.bar();
+        var b = new test.b.Foo();
+        b.bar();    
+    }
 
     static function testAnon() {
         var v = {a: 3, b: "hallo"};
@@ -221,5 +241,7 @@ class Main {
         trace(Math.abs(-1));
         testStringArray();
         testAnon();
+        testAandB();
+        testGeneric();
     }
 }

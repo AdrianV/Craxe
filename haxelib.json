@@ -7,8 +7,9 @@
 	"classPath": "src",
 	"description": "Transpiler to nim",
 	"contributors": [
-		"grabli66"
+		"grabli66",
+		"Adrian Veith"
 	],
-	"version": "0.2.0",
-	"url": "https://github.com/Grabli66/Craxe"
+	"version": "0.3.0",
+	"url": "https://github.com/AdrianV/Craxe"
 }

@@ -1,6 +1,7 @@
 typedef VRunner = Null<Void->Void>;
 
 @:structInit
+@:nullSafety
 class VExprInfo {
 	public var r: VRunner;
 	public var flat: Bool = true;

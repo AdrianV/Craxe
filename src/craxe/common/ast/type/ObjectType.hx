@@ -3,6 +3,7 @@ package craxe.common.ast.type;
 import haxe.macro.Type;
 import haxe.macro.Type.ClassType;
 import haxe.macro.Type.ClassField;
+import craxe.generators.nim.type.TypeResolver;
 
 /**
  * Base object info
@@ -33,6 +34,8 @@ class ObjectType {
 	 */
 	public final isHashable:Bool;
 
+	public final className: String;
+
 	/**
 	 * Constructor
 	 */
@@ -46,5 +49,6 @@ class ObjectType {
 		this.fields = fields;
 		this.methods = methods;
 		this.isHashable = isHashable;
+		this.className = TypeResolver.resolveClassType(classType, params);
 	}
 }

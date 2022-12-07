@@ -1,5 +1,4 @@
-develop_nim.hxml
-
+-lib craxe
 -D nim-out=./out/main.nim
 -D nim-dynamic=enable
 -D nim-speed=debug

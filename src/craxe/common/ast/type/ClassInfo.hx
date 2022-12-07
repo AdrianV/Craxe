@@ -18,6 +18,10 @@ class ClassInfo extends ObjectType {
 	 */
 	public final staticMethods:Array<ClassField>;
 
+	public var isPure: Bool = false;
+
+	public var constrParams: Array<String> = null;
+
 	/**
 	 * Constructor
 	 */

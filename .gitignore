@@ -4,3 +4,5 @@ main.nim
 nimboot.nim
 out
 bin
+core/src/tools/tokenhash
+test/benchmarks/mandelbrot/bin/nim/main

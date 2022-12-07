@@ -30,7 +30,7 @@
 #if (nim && !macro)
 @:native("nimsys")
 #end
- extern class Std {
+extern class Std {
      /**
          DEPRECATED. Use `Std.isOfType(v, t)` instead.
  

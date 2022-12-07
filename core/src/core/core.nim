@@ -382,7 +382,7 @@ proc getFields* (this: DynamicHaxeObjectRef): HaxeArray[string] =
     for f in this.fields:
         discard result.push($f.thash)
 
-proc getFieldByName* (this: DynamicHaxeObjectRef, name:string): Dynamic 
+proc getFieldByName* (this: DynamicHaxeObjectRef, name:string): Dynamic {.gcsafe.}
 
 proc setFieldByName* (this: DynamicHaxeObjectRef, name:string, value:Dynamic):void 
 
@@ -474,7 +474,7 @@ proc `{}`*(this:Dynamic, name:string):Dynamic {.gcsafe.} =
     else:
         nil
 
-proc `{}=`*(this:Dynamic, name:string, value: Dynamic) {.gcsafe.} =    
+proc `{}=`*(this:Dynamic, name:string, value: Dynamic) =    
     case this.kind
     of TAnonObject:
         this.fanon{name}=value
@@ -483,7 +483,7 @@ proc `{}=`*(this:Dynamic, name:string, value: Dynamic) {.gcsafe.} =
     else:
         discard
 
-proc `{}=`*[T](this:Dynamic, name:string, value: T) {.gcsafe.} =    
+proc `{}=`*[T](this:Dynamic, name:string, value: T) =    
     case this.kind
     of TAnonObject:
         this.fanon{name}=newDynamic(value)
@@ -493,7 +493,7 @@ proc `{}=`*[T](this:Dynamic, name:string, value: T) {.gcsafe.} =
         discard
 
 
-proc getFieldNames*(this:Dynamic):HaxeArray[string] {.gcsafe.} =
+proc getFieldNames*(this:Dynamic):HaxeArray[string] =
     case this.kind
     of TAnonObject:
         this.fanon.getFields()
@@ -653,7 +653,7 @@ macro `{}=`* [T](f: typed, name: static string, value: T) =
 template `{}`* (this: untyped, name: string): Dynamic =
     this.getFieldByName(name)
 
-proc getFieldByName* (this: DynamicHaxeObjectRef, name:string): Dynamic =
+proc getFieldByName* (this: DynamicHaxeObjectRef, name:string): Dynamic {.gcsafe.} =
     let f = this.fields.get(name)
     if f != nil :
         return f[].toDynamic

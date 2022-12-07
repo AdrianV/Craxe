@@ -1,5 +1,6 @@
 package craxe;
 
+import haxe.macro.Compiler;
 import craxe.common.ast.type.ClassInfo;
 import haxe.PosInfos;
 import haxe.Log;
@@ -15,6 +16,9 @@ class Generator {
 	#if macro
 
 	public static function generate() {
+		//Compiler.define('cpp', '0');
+		//Compiler.define('cppia', '0');
+		//Compiler.define('nim');
 		haxe.macro.Context.onGenerate(onGenerate);
 	}
 	#end
@@ -45,7 +49,7 @@ class Generator {
 			Sys.println(rest);
 		};
 
-		#if nim
+		#if (nim==1)
 		builder = new craxe.generators.nim.NimGenerator(processed);
 		compiler = new craxe.generators.nim.NimCompiler();
 		#end

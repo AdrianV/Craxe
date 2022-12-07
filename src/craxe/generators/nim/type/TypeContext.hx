@@ -16,52 +16,52 @@ class TypeContext {
 	/**
 	 * Information about interfaces
 	 */
-	final interfaces = new StringMap<InterfaceInfo>();
+	static final interfaces = new StringMap<InterfaceInfo>();
 
 	/**
 	 * Information about classes
 	 */
-	final classes = new StringMap<ClassInfo>();
+	static final classes = new StringMap<ClassInfo>();
 
 	/**
 	 * Information about enums
 	 */
-	final enums = new StringMap<EnumInfo>();
+	static final enums = new StringMap<EnumInfo>();
 
 	/**
 	 * All anon objects like typedef anonimous by id
 	 */
-	final anonById = new StringMap<AnonTypedefInfo>();
+	static final anonById = new StringMap<AnonTypedefInfo>();
 
 	/**
 	 * All anon objects like typedef by name
 	 */
-	final anonByName = new StringMap<AnonTypedefInfo>();
+	static final anonByName = new StringMap<AnonTypedefInfo>();
 
 	/**
 	 * Types for which need generate converters toDynamic
 	 */
-	final dynamicAllowed = new StringMap<Bool>();
+	static final dynamicAllowed = new StringMap<Bool>();
 
 	/**
 	 * Has interfaces
 	 */
-	public final hasInterfaces:Bool;
+	public static var hasInterfaces(default, null):Bool;
 
 	/**
 	 * Has classes
 	 */
-	public final hasClasses:Bool;
+	public static var hasClasses(default, null):Bool;
 
 	/**
 	 * Has enums
 	 */
-	public final hasEnums:Bool;
+	public static var hasEnums(default, null):Bool;
 
 	/**
 	 * Generate anon ID
 	 */
-	function generateAnonId(fields:Array<{name:String, type:Type}>):String {
+	static function generateAnonId(fields:Array<{name:String, type:Type}>):String {
 		fields.sort((x1, x2) -> {
 			var a = x1.name;
 			var b = x2.name;
@@ -74,7 +74,7 @@ class TypeContext {
 	/**
 	 * Constructor
 	 */
-	public function new(processed:PreprocessedTypes) {
+	public static function init(processed:PreprocessedTypes) {
 		for (item in processed.classes) {
 			classes.set(item.classType.name, item);
 		}
@@ -114,21 +114,21 @@ class TypeContext {
 	/**
 	 * Return iterator for all classes
 	 */
-	public function classIterator():Iterator<ClassInfo> {
+	public static function classIterator():Iterator<ClassInfo> {
 		return classes.iterator();
 	}
 
 	/**
 	 * Return iterator for all interfaces
 	 */
-	public function interfaceIterator():Iterator<InterfaceInfo> {
+	public static function interfaceIterator():Iterator<InterfaceInfo> {
 		return interfaces.iterator();
 	}
 
 	/**
 	 * Return iterator for all interfaces
 	 */
-	public function allAnonymous():Array<AnonTypedefInfo> {
+	public static function allAnonymous():Array<AnonTypedefInfo> {
 		var res = new Array<AnonTypedefInfo>();
 		for (item in anonById.iterator()) {
 			res.push(item);
@@ -140,28 +140,28 @@ class TypeContext {
 	/**
 	 * Return interface by name
 	 */
-	public function getInterfaceByName(name:String):InterfaceInfo {
+	public static function getInterfaceByName(name:String):InterfaceInfo {
 		return interfaces.get(name);
 	}
 
 	/**
 	 * Return enum by name
 	 */
-	public function getEnumByName(name:String):EnumInfo {
+	public static function getEnumByName(name:String):EnumInfo {
 		return enums.get(name);
 	}
 
 	/**
 	 * Return class by name
 	 */
-	public function getClassByName(name:String):ClassInfo {
+	public static function getClassByName(name:String):ClassInfo {
 		return classes.get(name);
 	}
 
 	/**
 	 * Return object by typefields
 	 */
-	public function getObjectTypeByFields(fields:Array<{name:String, type:Type}>):AnonTypedefInfo {
+	public static function getObjectTypeByFields(fields:Array<{name:String, type:Type}>):AnonTypedefInfo {
 		var id = generateAnonId(fields);
 		var anon = anonById.get(id);
 		if (anon == null) {
@@ -179,14 +179,14 @@ class TypeContext {
 	/**
 	 * Return object by name
 	 */
-	public function getObjectTypeByName(name:String):AnonTypedefInfo {
+	public static function getObjectTypeByName(name:String):AnonTypedefInfo {
 		return anonByName.get(name);
 	}
 
 	/**
 	 * Set dynamic support for type
 	 */
-	public function addDynamicSupport(name:String) {
+	public static function addDynamicSupport(name:String) {
 		ContextMacro.ckeckDynamicSupport();
 		var cls = getClassByName(name);
 		if (cls != null) {
@@ -204,14 +204,14 @@ class TypeContext {
 	/**
 	 * Return all types for which need build dynamic converters
 	 */
-	public function allDynamicConverters():Array<String> {
+	public static function allDynamicConverters():Array<String> {
 		return [for (key => _ in dynamicAllowed) key];
 	}
 
 	/**
 	 * Check if type has dynamic support
 	 */
-	public function isDynamicSupported(name:String):Bool {
+	public static function isDynamicSupported(name:String):Bool {
 		return dynamicAllowed.exists(name);
 	}
 }

@@ -1,0 +1,3 @@
+--macro craxe.Generator.generate()
+--no-output
+-D nim

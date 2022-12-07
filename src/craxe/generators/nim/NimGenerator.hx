@@ -27,16 +27,6 @@ class NimGenerator extends BaseGenerator {
 	static public inline final DEFAULT_OUT = "main.nim";
 
 	/**
-	 * Type context
-	 */
-	final typeContext:TypeContext;
-
-	/**
-	 * Type resolver
-	 */
-	final typeResolver:TypeResolver;
-
-	/**
 	 * Code generator for expressions
 	 */
 	final methodBodyGenerator:MethodExpressionGenerator;
@@ -84,7 +74,7 @@ class NimGenerator extends BaseGenerator {
 		for (arg in args) {
 			sb.add(NimNames.fixFieldVarName(arg.name));
 			sb.add(" : ");
-			sb.add(typeResolver.resolve(arg.t));
+			sb.add(TypeResolver.resolve(arg.t));
 			sb.addNewLine(Same);
 		}
 	}
@@ -94,7 +84,7 @@ class NimGenerator extends BaseGenerator {
 			var arg = args[i];
 			sb.add(arg.name);
 			sb.add(":");
-			sb.add(typeResolver.resolve(arg.t));
+			sb.add(TypeResolver.resolve(arg.t));
 			if (i + 1 < args.length)
 				sb.add(", ");
 		}
@@ -111,7 +101,7 @@ class NimGenerator extends BaseGenerator {
 		var anons = [];
 		for (i => arg in args) {
 			final name = MethodExpressionGenerator.scopes.createVar(arg.v, true);
-			final tn = typeResolver.resolve(arg.v.t);
+			final tn = TypeResolver.resolve(arg.v.t);
 			sb.add('$name: $tn');
 			switch arg.v.t {
 				case TAnonymous(a):
@@ -122,7 +112,7 @@ class NimGenerator extends BaseGenerator {
 				case null:
 				case TConst(c): 
 					sb.add(" = ");
-					methodBodyGenerator.generateTConst(sb, c);
+					methodBodyGenerator.generateTConst(sb, c, arg.value.t);
 				case v: throw 'unsupported $v';
 			}
 			if (i + 1 < args.length)
@@ -143,7 +133,7 @@ class NimGenerator extends BaseGenerator {
 			if ( !isStatic && i == 0) {
 				sb.add('${abstr.name}Abstr');
 			} else {
-				sb.add(typeResolver.resolve(arg.t));
+				sb.add(TypeResolver.resolve(arg.t));
 			}
 			if (i + 1 < args.length)
 				sb.add(", ");
@@ -160,7 +150,7 @@ class NimGenerator extends BaseGenerator {
 			case TFun(args, _):
 				generateTypeFields(sb, args);
 			case v:
-				sb.add(typeResolver.resolve(v));
+				sb.add(TypeResolver.resolve(v));
 		}
 	}
 
@@ -174,7 +164,7 @@ class NimGenerator extends BaseGenerator {
 			case TFun(args, _):
 				generateEnumArgumentsImpl(sb, args);
 			case v:
-				sb.add(typeResolver.resolve(v));
+				sb.add(TypeResolver.resolve(v));
 		}
 	}
 
@@ -193,7 +183,7 @@ class NimGenerator extends BaseGenerator {
 				sb.addNewLine(Inc);
 				sb.add('${enumName}(index: ${index}');
 			case TFun(args, _):
-				var params = typeResolver.resolveParameters(enumInfo.params);
+				var params = TypeResolver.resolveParameters(enumInfo.params);
 				sb.add('proc new${enumName}${params}(');
 				generateEnumArguments(sb, type);
 				sb.add(') : ${enumName}${params} {.inline.} =');
@@ -249,7 +239,7 @@ class NimGenerator extends BaseGenerator {
 			sb.addNewLine(Same);
 			sb.addNewLine(Same, true);
 
-			var params = typeResolver.resolveParameters(en.params);
+			var params = TypeResolver.resolveParameters(en.params);
 			for (constr in en.enumType.constructs) {
 				switch constr.type {
 					case TEnum(_, _):
@@ -283,7 +273,7 @@ class NimGenerator extends BaseGenerator {
 	 * Generate code for interfaces
 	 */
 	function buildInterfaces(sb:IndentStringBuilder) {
-		if (!typeContext.hasInterfaces)
+		if (!TypeContext.hasInterfaces)
 			return;
 
 		// Generate types for enums
@@ -291,16 +281,16 @@ class NimGenerator extends BaseGenerator {
 		sb.addNewLine(Inc);
 
 		var interGenerateor = new InterfaceGenerator();
-		for (inter in typeContext.interfaceIterator()) {
-			interGenerateor.generateInterfaceObject(sb, inter, typeResolver);
+		for (inter in TypeContext.interfaceIterator()) {
+			interGenerateor.generateInterfaceObject(sb, inter);
 		}
 
 		sb.addBreak();
 
-		for (cls in typeContext.classIterator()) {
+		for (cls in TypeContext.classIterator()) {
 			for (inter in cls.classType.interfaces) {
-				var cinter = typeContext.getInterfaceByName(inter.t.get().name);
-				interGenerateor.generateInterfaceConverter(sb, cls, cinter, typeResolver);
+				var cinter = TypeContext.getInterfaceByName(inter.t.get().name);
+				interGenerateor.generateInterfaceConverter(sb, cls, cinter);
 			}
 		}
 
@@ -312,7 +302,7 @@ class NimGenerator extends BaseGenerator {
 	 */
 	function buildTypedefs(sb:IndentStringBuilder) {
 		var typedefs = types.typedefs;
-		var anons = typeContext.allAnonymous();
+		var anons = TypeContext.allAnonymous();
 		if (typedefs.length < 1 && anons.length < 1)
 			return;
 
@@ -327,11 +317,11 @@ class NimGenerator extends BaseGenerator {
 					sb.add('${td.typedefInfo.name} = ${t.get().name}');
 					sb.addNewLine(Same);
 				case TFun(_, _):
-					var tpname = typeResolver.resolve(td.typedefInfo.type);
+					var tpname = TypeResolver.resolve(td.typedefInfo.type);
 					sb.add('${td.typedefInfo.name} = ${tpname}');
 					sb.addNewLine(Same);
 				case TAbstract(_, _):
-					var tpname = typeResolver.resolve(td.typedefInfo.type);
+					var tpname = TypeResolver.resolve(td.typedefInfo.type);
 					sb.add('${td.typedefInfo.name} = ${tpname}');
 					sb.addNewLine(Same);
 				case TAnonymous(a):
@@ -344,7 +334,7 @@ class NimGenerator extends BaseGenerator {
 			sb.add('${an.name} = ref object of DynamicHaxeObject');
 			sb.addNewLine(Inc);
 			for (fld in an.fields) {
-				var ftp = typeResolver.resolve(fld.type);
+				var ftp = TypeResolver.resolve(fld.type);
 				sb.add('${fld.name}:${ftp}');
 				sb.addNewLine(Same);
 			}
@@ -355,7 +345,7 @@ class NimGenerator extends BaseGenerator {
 			sb.add('instance: DynamicHaxeObjectRef');
 			sb.addNewLine(Same);
 			for (fld in an.fields) {
-				var ftp = typeResolver.resolve(fld.type);
+				var ftp = TypeResolver.resolve(fld.type);
 				sb.add('${fld.name}: ptr ${ftp}');
 				sb.addNewLine(Same);
 			}
@@ -370,7 +360,7 @@ class NimGenerator extends BaseGenerator {
 	 * Generate anon converters to dynamic
 	 */
 	function buildAnonMakeDynamic(sb:IndentStringBuilder) {
-		var anons = typeContext.allAnonymous();
+		var anons = TypeContext.allAnonymous();
 		if (anons.length < 1)
 			return;
 
@@ -407,7 +397,7 @@ class NimGenerator extends BaseGenerator {
 					sb.addNewLine(Inc);
 				else
 					sb.addNewLine(Same);
-				final tn = typeResolver.resolve(f.type);
+				final tn = TypeResolver.resolve(f.type);
 				sb.add(', ${f.name}: adr[$tn](v.fclass, "${f.name}")');
 				first = false;
 			}
@@ -461,10 +451,10 @@ class NimGenerator extends BaseGenerator {
 	 * Build class fields
 	 */
 	function generateClassInfo(sb:IndentStringBuilder, cls:ClassInfo) {
-		var clsName = cls.classType.name;
-		var params = typeResolver.resolveParameters(cls.params);
+		var clsName = cls.className;
+		var params = TypeResolver.resolveParameters(cls.params);
 
-		var baseTypeName = if (typeContext.isDynamicSupported(clsName)) {
+		var baseTypeName = if (TypeContext.isDynamicSupported(clsName)) {
 			"DynamicHaxeObject";
 		} else {
 			"HaxeObject";
@@ -473,14 +463,14 @@ class NimGenerator extends BaseGenerator {
 		var superName = if (cls.classType.superClass != null) {
 			var superType = cls.classType.superClass.t.get();
 			var spname = superType.name;
-			var spParams = typeResolver.resolveParameters(cls.classType.superClass.params);
+			var spParams = TypeResolver.resolveParameters(cls.classType.superClass.params);
 			'${spname}${spParams}';
 		} else {
 			baseTypeName;
 		}
 
 		if (true || cls.fields.length > 0 || cls.methods.length > 0) {
-			var line = '${clsName}${params} = ref object of ${superName}';
+			var line = '${clsName} = ref object of ${superName}';
 			sb.add(line);
 			sb.addNewLine(Same);
 			generateInstanceFields(sb, cls.fields, cls.isHashable);	
@@ -488,7 +478,7 @@ class NimGenerator extends BaseGenerator {
 
 		var staticFields = cls.classType.statics.get();
 		if (staticFields.length > 0) {
-			var line = '${cls.classType.name}Static = object of HaxeObject';
+			var line = '${cls.className}Static = object of HaxeObject';
 			sb.add(line);
 			sb.addNewLine(Same);
 			//sb.addNewLine(Same, true);
@@ -501,8 +491,8 @@ class NimGenerator extends BaseGenerator {
 	 */
 	function generateAbstractImpl(sb:IndentStringBuilder, cls:ClassInfo, abstr:AbstractType) {
 		var name = abstr.name;
-		var typeName = typeResolver.resolve(abstr.type);
-		var params = typeResolver.resolveParameters(abstr.params.map(x -> x.t));
+		var typeName = TypeResolver.resolve(abstr.type);
+		var params = TypeResolver.resolveParameters(abstr.params.map(x -> x.t));
 
 		var line = '${name}Abstr${params} = ${typeName}';
 		sb.add(line);
@@ -529,7 +519,7 @@ class NimGenerator extends BaseGenerator {
 		if (staticFields.length < 1)
 			return;
 
-		var clsName = typeResolver.getFixedTypeName(cls.classType.name);
+		var clsName = cls.className;
 		var hasStaticMethod = false;
 		var hasStaticVar = false;
 		for (field in staticFields) {
@@ -590,7 +580,9 @@ class NimGenerator extends BaseGenerator {
 		return false;
 	}
 
-	function buildPureConstructor(sb: IndentStringBuilder, constrExpr: TypedExpr) {
+	function buildPureConstructor(sb: IndentStringBuilder, constrExpr: TypedExpr) : Array<String>
+	{
+		var res = [];
 		switch constrExpr.expr {
 			case TFunction(_.expr.expr => TBlock(el)):
 				var first = true;
@@ -599,6 +591,7 @@ class NimGenerator extends BaseGenerator {
 						case TBinop(OpAssign, _.expr => TField(_.expr => TConst(TThis), FInstance(_, _, cf)) , e2):
 							final fname = NimNames.fixFieldVarName(cf.get().name);
 							if ( ! first) sb.add(",");
+							res.push(fname);
 							sb.add('$fname: ');
 							methodBodyGenerator.generateTBlockSingleExpression(sb, e2, false);
 							first = false;
@@ -607,6 +600,7 @@ class NimGenerator extends BaseGenerator {
 				}
 			case _:
 		}
+		return res;
 	}
 
 	/**
@@ -617,7 +611,7 @@ class NimGenerator extends BaseGenerator {
 			return;
 
 		var constructor = cls.classType.constructor.get();
-		var className = cls.classType.name;
+		var className = cls.className;
 		var superName:String = null;
 		var superConstructor:ClassField = null;
 
@@ -631,9 +625,8 @@ class NimGenerator extends BaseGenerator {
 		switch [constrExp.t, constrExp.expr] {
 			case [TFun(_, _), TFunction(tfunc)]:
 				MethodExpressionGenerator.scopes.newScope();
-				var params = typeResolver.resolveParameters(cls.params);
-
-				final supportsDynamic = typeContext.isDynamicSupported(className);
+				var params = TypeResolver.resolveParameters(cls.params);
+				final supportsDynamic = TypeContext.isDynamicSupported(className);
 				// Generate procedures for dynamic support
 				if (supportsDynamic) {
 					var fields = cls.classType.fields.get();
@@ -645,7 +638,7 @@ class NimGenerator extends BaseGenerator {
 
 					sb.addBreak();
 					
-					sb.add('proc getFieldByNameInternal${params}(this:${className}${params}, name:system.string):Dynamic =');
+					sb.add('proc getFieldByNameInternal${params}(this:${className}, name:system.string):Dynamic =');
 					sb.addNewLine(Inc);
 					if (fields.length > 0) {
 						sb.add("case name");
@@ -660,9 +653,9 @@ class NimGenerator extends BaseGenerator {
 					}
 					sb.addBreak();
 
-					sb.add('proc fromDynamic${params}(this:Dynamic):${className}${params} =');
+					sb.add('proc fromDynamic${params}(this:Dynamic):${className} =');
 					sb.addNewLine(Inc);
-					sb.add('cast[${className}${params}](this.fclass)');
+					sb.add('cast[${className}](this.fclass)');
 					sb.addBreak();
 				}
 				final isPure = constructorIsPure(constrExp);
@@ -672,25 +665,26 @@ class NimGenerator extends BaseGenerator {
 				if (! isPure || supportsDynamic) {
 					// Generate constructor
 					MethodExpressionGenerator.scopes.newScope();
-					sbCon.add('proc new${className}${params}(');
+					sbCon.add('proc new${className} (');
 					sbCon.add(sbArgs.toString());
-					sbCon.add(') : ${className}${params} {.inline.}');
+					sbCon.add(') : ${className} {.inline.}');
 					sb.add(sbCon.toString());
 				} else {
-					sb.add('template new${className}${params}(');
+					sb.add('proc new${className}(');
 					sb.add(sbArgs.toString());
-					sb.add(') : ${className}${params} =');
+					sb.add(') : ${className} =');
 					sb.addNewLine(Inc);
-					sb.add('${className}${params}(kind: THaxe, ');
-					buildPureConstructor(sb, constrExp);
+					sb.add('${className}(kind: THaxe, ');
+					cls.constrParams = buildPureConstructor(sb, constrExp);
 					sb.add(")");
 					sb.addNewLine(Dec);
+					cls.isPure = true;
 				}
 				sb.addBreak();
 
 				// Generate init proc for haxe "super(params)"
 				MethodExpressionGenerator.scopes.newScope();
-				sb.add('proc init${className}${params}(this:${className}${params}');
+				sb.add('proc init${className}(this:${className}');
 				if (tfunc.args.length > 0) {
 					sb.add(", ");
 					sb.add(sbArgs.toString());
@@ -712,7 +706,7 @@ class NimGenerator extends BaseGenerator {
 					sbCon.add(" =");
 					sb.add(sbCon.toString());
 					sb.addNewLine(Inc);
-					sb.add('var this = ${className}${params}()');
+					sb.add('var this = ${className}()');
 					sb.addNewLine(Same);
 					sb.add('init${className}(this');
 					if (tfunc.args.length > 0) {
@@ -748,7 +742,7 @@ class NimGenerator extends BaseGenerator {
 		switch [expr.t, expr.expr] {
 			case [TFun(_, ret), TFunction(tfunc)]:
 				MethodExpressionGenerator.scopes.newScope();
-				var clsName = !isStatic ? cls.classType.name : '${cls.classType.name}Static';
+				var clsName = !isStatic ? cls.className : '${cls.className}Static';
 				sb.add('proc ${method.name}(this:${clsName}');
 				var anons = null;
 				if (tfunc.args.length > 0) {
@@ -756,7 +750,7 @@ class NimGenerator extends BaseGenerator {
 					anons = generateFuncArguments(sb, tfunc.args);
 				}
 				sb.add(") : ");
-				sb.add(typeResolver.resolve(ret));
+				sb.add(TypeResolver.resolve(ret));
 				sb.add(" =");
 				sb.addNewLine(Inc);
 				if (anons != null && anons.length > 0) 
@@ -779,14 +773,14 @@ class NimGenerator extends BaseGenerator {
 				var name = abstr.name;
 				var methname = StringTools.replace(method.name, "_", "");
 				final params = abstr.params.concat(method.params);
-				var parstr = typeResolver.resolveParameters(params.map(x -> x.t));
+				var parstr = TypeResolver.resolveParameters(params.map(x -> x.t));
 
 				sb.add('proc ${methname}${name}Abstr${parstr}(');
 				if (tfunc.args.length > 0) {
 					generateFuncArgumentsAbstract(sb, abstr, tfunc.args, isStatic);
 				}
 				sb.add(") : ");
-				sb.add(typeResolver.resolve(ret));
+				sb.add(TypeResolver.resolve(ret));
 				sb.add(" =");
 				sb.addNewLine(Inc);
 
@@ -810,7 +804,7 @@ class NimGenerator extends BaseGenerator {
 				for (f in cls.staticFields) {
 					if (f.isExtern) continue;
 					final info = methodBodyGenerator.getStaticTFieldData(cls.classType, f);
-					final ft = typeResolver.resolve(f.type);
+					final ft = TypeResolver.resolve(f.type);
 					sb.add('var ${info.totalName}: $ft');
 					final expr = f.expr();
 					if (expr != null) {
@@ -836,8 +830,9 @@ class NimGenerator extends BaseGenerator {
 		// Generate heplers
 		switch cls.classType.kind {
 			case KNormal:
-				var clsName = cls.classType.name;
-				sb.add('proc `$`(this:${clsName}) : system.string {.inline.} = ');
+				var clsName = cls.className;
+				var params = TypeResolver.resolveParameters(cls.params);
+				sb.add('proc `$`$params(this:${clsName}) : system.string {.inline.} = ');
 				sb.addNewLine(Inc);
 				sb.add('return "${clsName}"' + " & $this[]");
 				sb.addBreak();
@@ -858,14 +853,6 @@ class NimGenerator extends BaseGenerator {
 
 		var constrBuilder = new IndentStringBuilder();
 		var methBuilder = new IndentStringBuilder();
-		// Generate class methods
-		for (c in classes) {
-			if (c.classType.isExtern == false) {
-				if (!c.classType.isInterface) {
-					generateClassMethods(methBuilder, c);
-				}
-			}
-		}
 
 		// Generate class constructors
 		for (c in classes) {
@@ -875,6 +862,16 @@ class NimGenerator extends BaseGenerator {
 				}
 			}
 		}
+
+		// Generate class methods
+		for (c in classes) {
+			if (c.classType.isExtern == false) {
+				if (!c.classType.isInterface) {
+					generateClassMethods(methBuilder, c);
+				}
+			}
+		}
+
 
 		sb.add("### Classes and structures");
 		sb.addNewLine();
@@ -923,16 +920,15 @@ class NimGenerator extends BaseGenerator {
 	 */
 	function buildEntryPointMain(sb:IndentStringBuilder, entryPoint:EntryPointInfo) {
 		sb.addNewLine(None);
-		var clsName = entryPoint.classInfo.classType.name;
+		var clsName = entryPoint.classInfo.className;
 		var methodName = entryPoint.method.name;
 		sb.add('${clsName}StaticInst.${methodName}()');
 	}
 
 	public function new(processed:PreprocessedTypes) {
 		super(processed);
-		typeContext = new TypeContext(processed);
-		typeResolver = new TypeResolver(typeContext);
-		methodBodyGenerator = new MethodExpressionGenerator(typeContext, typeResolver);
+		TypeContext.init(processed);
+		methodBodyGenerator = new MethodExpressionGenerator();
 	}
 
 	/**

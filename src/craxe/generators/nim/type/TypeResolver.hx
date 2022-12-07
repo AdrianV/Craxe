@@ -27,7 +27,7 @@ class TypeResolver {
 	/**
 	 * Context with all types
 	 */
-	final context:TypeContext;
+	static final context = TypeContext;
 
 	/**
 	 * Check type is simple by type name
@@ -58,7 +58,7 @@ class TypeResolver {
 	/**
 	 * Generate simple type
 	 */
-	function generateSimpleType(sb:StringBuf, type:String):Bool {
+	static function generateSimpleType(sb:StringBuf, type:String):Bool {
 		var res = simpleTypes.get(type);
 		if (res != null) {
 			sb.add(res);
@@ -71,7 +71,7 @@ class TypeResolver {
 	/**
 	 * Generate code for pass modificator
 	 */
-	function generatePassModificator(sb:StringBuf, t:AbstractType, params:Array<Type>):Bool {
+	static function generatePassModificator(sb:StringBuf, t:AbstractType, params:Array<Type>):Bool {
 		if (t.name == "Var") {
 			sb.add("var ");
 			for (par in params) {
@@ -85,14 +85,14 @@ class TypeResolver {
 	/**
 	 * Generate TEnum
 	 */
-	function generateTEnum(sb:StringBuf, enumType:EnumType, params:Array<Type>) {
+	static function generateTEnum(sb:StringBuf, enumType:EnumType, params:Array<Type>) {
 		sb.add(getFixedTypeName(enumType.name));
 	}
 
 	/**
 	 * Generate TAbstract
 	 */
-	function generateTAbstract(sb:StringBuf, t:AbstractType, params:Array<Type>) {
+	static function generateTAbstract(sb:StringBuf, t:AbstractType, params:Array<Type>) {
 		if (generateSimpleType(sb, t.name))
 			return;
 
@@ -121,12 +121,18 @@ class TypeResolver {
 	/**
 	 * Generate TInst
 	 */
-	function generateTInst(sb:StringBuf, t:ClassType, params:Array<Type>) {
+	static function generateTInst(sb:StringBuf, t:ClassType, params:Array<Type>) {
 		if (generateSimpleType(sb, t.name))
 			return;
 
 		var nativeName = t.meta.getMetaValue(":native");
-		var typeName = nativeName != null ? nativeName : getFixedTypeName(t.name);
+		var typeName = nativeName != null ? nativeName : { 
+			switch t.pack {
+				case [] | ["haxe"]: getFixedTypeName(t.name);
+				case _ if (t.kind.match(KTypeParameter(_))): getFixedTypeName(t.name);
+				case _: getFixedTypeName(t.name) + 'X' + t.pack.join('');
+			}
+		};
 		sb.add(typeName);
 		if (params != null && params.length > 0) {						
 			sb.add(resolveParameters(params));
@@ -136,7 +142,7 @@ class TypeResolver {
 	/**
 	 * Generate TType
 	 */
-	function generateTType(sb:StringBuf, t:DefType, params:Array<Type>) {
+	static function generateTType(sb:StringBuf, t:DefType, params:Array<Type>) {
 		if (params.length > 0) {
 			final ps = resolveParameters(params);
 			sb.add(t.name + ps);
@@ -146,7 +152,7 @@ class TypeResolver {
 	/**
 	 * Generate TFun
 	 */
-	function generateTFun(sb:StringBuf, args:Array<ArgumentInfo>, ret:Type) {
+	static function generateTFun(sb:StringBuf, args:Array<ArgumentInfo>, ret:Type) {
 		sb.add("proc(");
 		sb.add(args.map(x -> '${x.name}:${resolve(x.t)}').join(", "));
 		sb.add("):");
@@ -157,7 +163,7 @@ class TypeResolver {
 	/**
 	 * Generate TAnonymous
 	 */
-	function generateTAnonymous(sb:StringBuf, anon:AnonType) {		
+	static function generateTAnonymous(sb:StringBuf, anon:AnonType) {		
 		final object = context.getObjectTypeByFields(anon.fields);		
 		sb.add(object.name);
 	}
@@ -165,29 +171,29 @@ class TypeResolver {
 	/**
 	 * Generate TDynamic
 	 */
-	function generateTDynamic(sb:StringBuf, dyn:Type) {
+	static function generateTDynamic(sb:StringBuf, dyn:Type) {
 		sb.add("Dynamic");
 	}
 
 	/**
 	 * 	 Generate TMono
 	 */
-	function generateTMono(sb:StringBuf, dyn:Type) {
+	static function generateTMono(sb:StringBuf, dyn:Type) {
 		sb.add("Dynamic");
 	}
 
 	/**
 	 * Constructor
 	 */
-	public function new(context:TypeContext) {
-		this.context = context;
-	}
+	//public function new(context:TypeContext) {
+	//	this.context = context;
+	//}
 
 	/**
 	 * Return fixed type name
 	 * @param name
 	 */
-	public function getFixedTypeName(name:String) {
+	public static function getFixedTypeName(name:String) {
 		switch name {
 			case "Array":
 				return "HaxeArray";
@@ -201,7 +207,7 @@ class TypeResolver {
 	/**
 	 * Return fixed field name that can be a keyword in nim
 	 */
-	public function getFixedFieldName(name:String) {
+	public static function getFixedFieldName(name:String) {
 		switch name {
 			case "iterator":
 				return "fixedIterator";
@@ -213,7 +219,7 @@ class TypeResolver {
 	/**
 	 * Return type parameters as string
 	 */
-	public function resolveParameters(params:Array<Type>):String {
+	public static function resolveParameters(params:Array<Type>):String {
 		if (params.length > 0) {
 			var sb = new StringBuf();
 
@@ -231,7 +237,7 @@ class TypeResolver {
 	/**
 	 * Resolve arguments to resolved arguments
 	 */
-	public function resolveArguments(args:Array<ArgumentInfo>):Array<ResolvedArgumentInfo> {
+	public static function resolveArguments(args:Array<ArgumentInfo>):Array<ResolvedArgumentInfo> {
 		return args.map(x -> {
 			return {
 				name: x.name,
@@ -241,10 +247,17 @@ class TypeResolver {
 		});
 	}
 
+	public static function resolveClassType(classType:ClassType, params:Array<Type>) : String
+	{
+		var sb = new StringBuf();
+		generateTInst(sb, classType, params);
+		return sb.toString();
+	}
+
 	/**
 	 * Resolve types to string
 	 */
-	public function resolve(type:Type):String {
+	public static function resolve(type:Type):String {
 		var sb = new StringBuf();
 		switch (type) {
 			case TEnum(t, params):

@@ -16,7 +16,7 @@ class InterfaceGenerator {
 	/**
 	 * Generate tuple object with interface fields
 	 */
-	public function generateInterfaceObject(sb:IndentStringBuilder, interfaceInfo:InterfaceInfo, typeResolver:TypeResolver) {
+	public function generateInterfaceObject(sb:IndentStringBuilder, interfaceInfo:InterfaceInfo) {
 		var iname = interfaceInfo.classType.name;
 		sb.add('${iname} = tuple[');
 		sb.addNewLine(Inc);
@@ -26,7 +26,7 @@ class InterfaceGenerator {
 			sb.addNewLine(Same);
 			sb.add(field.name);
 			sb.add(" : ptr ");
-			sb.add(typeResolver.resolve(field.type));
+			sb.add(TypeResolver.resolve(field.type));
 		}
 
 		for (meth in interfaceInfo.methods) {
@@ -37,7 +37,7 @@ class InterfaceGenerator {
 			sb.add("proc (");
 			switch (meth.type) {
 				case TFun(args, ret):
-					var resolved = typeResolver.resolveArguments(args);
+					var resolved = TypeResolver.resolveArguments(args);
 					if (resolved.length > 0) {
 						var sargs = resolved.map(x -> {
 							return '${x.name}:${x.t}';
@@ -45,7 +45,7 @@ class InterfaceGenerator {
 						sb.add(sargs);
 					}
 					sb.add(") : ");
-					sb.add(typeResolver.resolve(ret));
+					sb.add(TypeResolver.resolve(ret));
 				case v:
 					throw 'Unsupported ${v}';
 			}
@@ -58,7 +58,7 @@ class InterfaceGenerator {
 	/**
 	 * Generate converter to interface for class
 	 */
-	public function generateInterfaceConverter(sb:IndentStringBuilder, classInfo:ClassInfo, interfaceInfo:InterfaceInfo, typeResolver:TypeResolver) {
+	public function generateInterfaceConverter(sb:IndentStringBuilder, classInfo:ClassInfo, interfaceInfo:InterfaceInfo) {
 		var iname = interfaceInfo.classType.name;
 		var cname = classInfo.classType.name;
 		sb.add('proc to${iname}(this:${cname}) : ${iname} = ');
@@ -84,7 +84,7 @@ class InterfaceGenerator {
 			sb.add("proc (");
 			switch (meth.type) {
 				case TFun(args, ret):
-					var resolved = typeResolver.resolveArguments(args);
+					var resolved = TypeResolver.resolveArguments(args);
 					if (resolved.length > 0) {
 						var sargs = resolved.map(x -> {
 							return '${x.name}:${x.t}';
@@ -93,7 +93,7 @@ class InterfaceGenerator {
 					}
 
 					sb.add(") : ");
-					sb.add(typeResolver.resolve(ret));
+					sb.add(TypeResolver.resolve(ret));
 					sb.add(' = this.${meth.name}(');
 					if (resolved.length > 0) {
 						var sargs = resolved.map(x -> x.name).join(", ");

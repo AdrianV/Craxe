@@ -60,7 +60,7 @@ proc get* [V](hay: TokenTable[V], token: string): ptr V =
   var  pos = binSearch(hay, thash)
   if pos.found: return unsafeAddr hay[pos.int].data
 
-template insertImpl(hay: typed, token: string, doInsert: untyped) =
+template insertImpl(hay: typed, token: string, doInsert, done: untyped) =
   let thash{.inject.}: THash = tokenhash(token)
   var pos{.inject.} = binSearch(hay, thash)
   if not pos.found: 
@@ -71,25 +71,27 @@ template insertImpl(hay: typed, token: string, doInsert: untyped) =
     if not p2.found: 
       allTokens.insert(TokenField[string](thash: thash, data: token), p2.index)
     elif allTokens[p2.val].data != token : raise newException(ErrorDuplicateToken, token & " and " & allTokens[p2.val].data & " share the same hash " & $int32(thash))
+  done
 
 proc getOrInsert* [V](hay: var TokenTable[V], token: string): ptr V {.discardable.}= 
   template doInsert(thash, pos) =
     hay.insert(TokenField[V](thash: thash), pos)
-  insertImpl(hay, token, doInsert)
-  return addr hay[pos.val].data
+  insertImpl(hay, token, doInsert):
+    return addr hay[pos.val].data
 
 template setOrInsert* [V](hay: var TokenTable[V], token: string, value: V): ptr V = 
   var isSet = false
   template doInsert(thash, pos) =
     hay.insert(TokenField[V](thash: thash, data: value), pos)
     isSet = true
-  insertImpl(hay, token, doInsert)
-  if not isSet: addr hay[pos.val].data else: nil
+  insertImpl(hay, token, doInsert):
+    let result = if not isSet: addr hay[pos.val].data else: nil
+  result
 
 proc insert* [V](hay: var TokenTable[V], token: string, v: V) = 
   template doInsert(thash, pos) =
       hay.insert(TokenField[V](thash: thash, data: v), pos)
-  insertImpl(hay, token, doInsert)
+  insertImpl(hay, token, doInsert): discard
 
 proc `$`* (v: THash): string =
   let pos = allTokens.binSearch(v)

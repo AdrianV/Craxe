@@ -41,8 +41,8 @@ class NimCompiler extends BaseCompiler {
 			case _: 
 		}
 		params.push(switch defines.get("nim-gc") {
-			case null: "--gc:orc";
-			case v: '--gc:$v';
+			case null: "--mm:orc";
+			case v: '--mm:$v';
 		});
 		params = params.concat(switch defines.get("nim-extra") {
 			case null: [];
