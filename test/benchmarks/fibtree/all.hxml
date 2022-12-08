@@ -35,10 +35,9 @@ build.hxml
 
 --next
 -lib craxe
---macro craxe.Generator.generate()
---no-output
 -D nim
 -D nim-out=./bin/nim/main.nim
--D nim-dynamic=enable
+#-D nim-dynamic=enable
 -D eval-stack
 -D nim-gc=arc
+-D nim-speed=fastest

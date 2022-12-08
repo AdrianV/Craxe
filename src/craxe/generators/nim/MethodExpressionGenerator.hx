@@ -412,8 +412,9 @@ class MethodExpressionGenerator {
 			case TBool(b):
 				sb.add(Std.string(b));
 			case TNull:
-				final tn = TypeResolver.resolve(t);
-				sb.add('$tn.default');
+				//final tn = TypeResolver.resolve(t);
+				// sb.add('$tn.default');
+				sb.add('nil');
 			case TThis:
 				sb.add("this");
 			case TSuper:
@@ -432,6 +433,7 @@ class MethodExpressionGenerator {
 		var vartype = '${TypeResolver.resolve(vr.t)}';
 		switch vartype {
 			case "int32", "float", "Dynamic": sb.add(': $vartype');
+			case _ if (expr == null): sb.add(': $vartype');
 		}
 		
 
