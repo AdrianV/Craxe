@@ -296,7 +296,11 @@ class MethodExpressionGenerator {
 
 		var fieldName = classField.name;
 		var totalName = "";
-
+		final Static = switch classField.kind {
+			case FVar(read, write): 'StaticInst';
+			case FMethod(k): 'Static';
+		}
+		//isCall ? 'Static' : 'StaticInst';
 		if (classType.isExtern) {
 			var isTop = classField.meta.has(":topFunction");
 			className = classType.meta.getMetaValue(":native");
@@ -304,7 +308,7 @@ class MethodExpressionGenerator {
 			if (className == null) {
 				// TODO: make it better. Maybe getSystemFieldTotalName(classType, classField) ?
 				if (classType.module.indexOf("sys.io.") > -1) {
-					className = '${classType.name}StaticInst';
+					className = '${classType.name}$Static';
 				} else {
 					className = classType.name;
 				}
@@ -326,13 +330,16 @@ class MethodExpressionGenerator {
 
 			switch classType.kind {
 				case KNormal:
-					className = '${name}StaticInst';
+					className = '${name}$Static';
 					totalName = '${className}.${fieldName}';
 				case KAbstractImpl(a):
 					var abstr = a.get();
 					className = '${abstr.name}Abstr';
 					fieldName = fieldName.replace("_", "");
 					totalName = '${fieldName}${className}';
+				case KModuleFields(module):
+					className = '${module}$Static';
+					totalName = '${className}.${fieldName}';
 				case v:
 					throw 'Unsupported ${v}';
 			}
@@ -433,7 +440,14 @@ class MethodExpressionGenerator {
 		var vartype = '${TypeResolver.resolve(vr.t)}';
 		switch vartype {
 			case "int32", "float", "Dynamic": sb.add(': $vartype');
-			case _ if (expr == null): sb.add(': $vartype');
+			case _ :
+				if (expr == null) sb.add(': $vartype');
+				else {
+					switch expr.expr {
+						case TConst(TNull): sb.add(': $vartype');
+						case _:
+					}
+				}
 		}
 		
 
@@ -471,14 +485,16 @@ class MethodExpressionGenerator {
 		//var typeParams = TypeResolver.resolveParameters(params);
 		var isPure = false;
 		var clsInfo: ClassInfo = null;
-		var varTypeName = if (classType.isExtern && classType.superClass != null && classType.superClass.t.get().name == "Distinct") {
+		var varTypeName = if ((classType.isExtern && classType.superClass != null && classType.superClass.t.get().name == "Distinct")
+							|| (typeName.startsWith('HaxeArray['))) 
+		{
 			typeName;
 		} else {
 			clsInfo = TypeContext.getClassByName(typeName);
 			if (clsInfo != null && clsInfo.isPure && clsInfo.constrParams.length == elements.length) {
 				isPure = true;
 				typeName;
-			} else
+			} else 
 				'new${typeName}';
 		}
 
@@ -1014,6 +1030,7 @@ class MethodExpressionGenerator {
 			case OpInterval:
 			case OpArrow:
 			case OpIn:
+			case OpNullCoal:
 		}
 		sb.add(" ");
 		switch typMix {
@@ -1142,20 +1159,23 @@ class MethodExpressionGenerator {
 	 * Generate code for calling base class field
 	 */
 	function generateSuperCall(sb:IndentStringBuilder, classType:ClassType, classField:ClassField) {
-		var name = classType.name;
-		sb.add('cast[${name}](this)');
+		final name = TypeResolver.resolveClassType(classType, [for (p in classType.params) p.t]);
+		//var name = classType.name;
+		sb.add('procCall(cast[${name}](this)');
 	}
 
 	/**
 	 * Generate code for calling field
 	 */
-	function generateTCallTField(sb:IndentStringBuilder, expression:TypedExpr, access:FieldAccess) {
+	function generateTCallTField(sb:IndentStringBuilder, expression:TypedExpr, access:FieldAccess): Bool {
+		var res = false;
 		switch (expression.expr) {
 			case TTypeExpr(_):
 			case TConst(TSuper):
 				switch (access) {
 					case FInstance(c, params, cf):
 						generateSuperCall(sb, c.get(), cf.get());
+						res = true;
 					case v:
 						throw 'Unsupported ${v}';
 				}
@@ -1192,6 +1212,7 @@ class MethodExpressionGenerator {
 			case v:
 				throw 'Unsupported ${v}';
 		}
+		return res;
 	}
 
 	/**
@@ -1315,6 +1336,7 @@ class MethodExpressionGenerator {
 
 		var isTraceCall = false;
 		var isAsync = false;
+		var needExtraBracket = false;
 		final needDiscard = wantVoid && switch expression.t {
 			case TInst(_, _): true;
 			case TAbstract(t, _): t.get().name != "Void";
@@ -1344,13 +1366,14 @@ class MethodExpressionGenerator {
 				}
 
 				if (!isAsync) {
-					generateTCallTField(sb, e, fa);
+					needExtraBracket = generateTCallTField(sb, e, fa);
 					sb.add("(");
 				}
 			case TConst(TSuper):
 				if (classContext.classType.superClass != null) {
-					var superCls = classContext.classType.superClass.t.get();
-					var superName = superCls.name;
+					final superCls = classContext.classType.superClass.t.get();
+					final superName = TypeResolver.resolveClassType(superCls, [for (p in superCls.params) p.t]);
+					//var superName = superCls.name;
 					sb.add('init${superName}(this, ');
 				}
 			case TLocal(v):
@@ -1455,7 +1478,8 @@ class MethodExpressionGenerator {
 
 		if (!isAsync)
 			sb.add(")");
-
+		if (needExtraBracket)
+			sb.add(")");
 		if (wasConverter)
 			sb.add(")");
 	}

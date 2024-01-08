@@ -4,5 +4,5 @@ type
 let FileStaticInst* = FileStatic()
 
 # File
-template getContent*(this:FileStatic, path:string): string =
+template getContent*(this:typedesc[FileStatic], path:string): string =
     readFile(path)

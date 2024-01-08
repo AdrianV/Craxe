@@ -49,8 +49,13 @@ type
 
     NullAbstr*[T] = Null[T]
 
-    # --- Haxe Iterator ---
+    # Dynamic object with access to fields by name
+    DynamicHaxeObject* = object of HaxeObject
+        fields*: FieldTable
 
+    DynamicHaxeObjectRef* = ref DynamicHaxeObject
+
+    # --- Haxe Iterator ---
     HaxeIterator*[T] = ref object of DynamicHaxeObject
         hasNext*:proc():bool
         next*:proc():T
@@ -87,12 +92,6 @@ type
 
     # Haxe anonimous object
     AnonObject* = seq[AnonField]
-
-    # Dynamic object with access to fields by name
-    DynamicHaxeObject* = object of HaxeObject
-        fields*: FieldTable
-
-    DynamicHaxeObjectRef* = ref DynamicHaxeObject
 
     # Dynamic proxy for real object
     DynamicHaxeObjectProxy*[T] = object of DynamicHaxeObject

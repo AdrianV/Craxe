@@ -1,9 +1,11 @@
 package craxe.common.ast;
 
+import haxe.macro.Expr;
 import craxe.common.ast.EntryPointInfo;
 import craxe.common.ast.type.*;
 import haxe.ds.StringMap;
 import haxe.macro.Type;
+import craxe.common.ast.type.ClassInfo;
 
 /**
  * Build class result
@@ -83,17 +85,41 @@ class CommonAstPreprocessor {
 	/**
 	 * Get fields and methods of instance
 	 */
-	function getFieldsAndMethods(c:ClassType):{
+	function getFieldsAndMethods(c:ClassType, ? methodInfo: MethodInfo):{
 		fields:Array<ClassField>,
 		methods:Array<ClassField>,
 		isHashable:Bool
 	} {
 		var classFields = c.fields.get();
 
-		var fields = [];
-		var methods = [];
+		final fields = [];
+		final methods = [];
 		var isHashable = false;
-
+		var hasOverrides = false;
+		var overMap = new Array<String>();
+		if (methodInfo != null) for (o in c.overrides) {
+			hasOverrides = true;
+			final om = o.get();
+			methodInfo.set('${om.pos}', Override);
+			overMap.push(om.name);
+		}
+		if (hasOverrides) {
+			var sup = c.superClass;
+			while (sup != null && overMap.length > 0) {
+				final supi = sup.t.get();
+				for (f in supi.fields.get()) if (f.kind.match(FMethod(MethNormal))) {
+					final idx = overMap.indexOf(f.name);
+					if (idx >= 0) {
+						final s = '${f.pos}';
+						if (! methodInfo.exists(s)) {
+							methodInfo.set(s, Base);
+						}
+						overMap.splice(idx, 1);
+					}
+				}
+				sup = supi.superClass;
+			}
+		}
 		for (ifield in classFields) {
 			switch (ifield.kind) {
 				case FVar(_, _):
@@ -111,7 +137,6 @@ class CommonAstPreprocessor {
 					}
 			}
 		}
-
 		return {
 			fields: fields,
 			methods: methods,
@@ -203,7 +228,7 @@ class CommonAstPreprocessor {
 	 * Build class info
 	 */
 	function buildClass(c:ClassType, params:Array<Type>):BuildClassResult {
-		var instanceRes = getFieldsAndMethods(c);
+		var instanceRes = getFieldsAndMethods(c, ClassInfo.methodInfo);
 		var staticRes = getStaticFieldsAndMethods(c);
 
 		var classInfo = new ClassInfo(c, 

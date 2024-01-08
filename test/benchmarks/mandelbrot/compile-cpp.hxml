@@ -1,8 +1,11 @@
+-D analyzer-optimize
 --main Mandelbrot
+--dce full
+--each
+
 -cpp bin/cpp
 
 --next
---main Mandelbrot
 -cpp bin/cpp-anon
 -D anon_objects
 -D anon_fair

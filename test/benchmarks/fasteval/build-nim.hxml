@@ -4,6 +4,6 @@
 -main Main
 -D nim-out=./bin/nim/main.nim
 -D nim-speed=fastest
--D nim-gc=refc
+#-D nim-gc=refc
 #-D nim-dynamic=enable
 -D eval-stack

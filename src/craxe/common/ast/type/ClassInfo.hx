@@ -3,6 +3,7 @@ package craxe.common.ast.type;
 import haxe.macro.Type;
 import haxe.macro.Type.ClassType;
 import haxe.macro.Type.ClassField;
+import haxe.macro.Expr.Position;
 
 /**
  * Info about class
@@ -21,6 +22,8 @@ class ClassInfo extends ObjectType {
 	public var isPure: Bool = false;
 
 	public var constrParams: Array<String> = null;
+
+	public static final methodInfo: MethodInfo = new Map();
 
 	/**
 	 * Constructor
@@ -57,3 +60,11 @@ class ClassInfo extends ObjectType {
 		return base;
 	}
 }
+
+enum VirtualInfo {
+	None;
+    Base;
+    Override;
+}
+
+typedef MethodInfo = Map<String, VirtualInfo>;

@@ -10,7 +10,7 @@ type
 let HaxeBytesStaticInst* = HaxeBytesStatic()
 
 # Bytes
-template alloc*(this:HaxeBytesStatic, size:int) : HaxeBytes =
+template alloc*(this:typedesc[HaxeBytesStatic], size:int) : HaxeBytes =
     HaxeBytes(b: newSeq[byte](size));
 
 template get*(this:seq[byte], pos:int):Natural =

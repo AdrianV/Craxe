@@ -1,0 +1,10 @@
+-cp src
+-D analyzer-optimize
+--dce full
+-main Main
+--each
+
+-hl bin/main.hl
+
+--next
+-hl bin/hl/tree.c

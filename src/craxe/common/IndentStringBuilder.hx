@@ -17,6 +17,7 @@ enum BufferItem {
 	Data(s:String);
 	Line(v:IndentType);
 	Indent(v:IndentType);
+	Call(cb: Void->String);
 }
 
 /**
@@ -159,15 +160,17 @@ class IndentStringBuilder {
 		var state = 0;
 
 		for (item in buffer) {
+			function addData(s: String) {
+				if (state != 1) {
+					indStr = calcIndent(ind);
+					res.add(indStr);
+				}
+				res.add(s);
+				state = 1;
+			}
 			switch item {
 				case Data(s):
-					if (state != 1) {
-						indStr = calcIndent(ind);
-						res.add(indStr);
-					}
-
-					res.add(s);
-					state = 1;
+					addData(s);
 				case Line(v):
 					state = 2;
 					res.add("\n");
@@ -175,6 +178,8 @@ class IndentStringBuilder {
 				case Indent(v):
 					state = 3;
 					proccIndent(v);
+				case Call(cb):
+					addData(cb());
 			}
 		}
 

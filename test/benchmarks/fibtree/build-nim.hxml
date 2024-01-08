@@ -1,0 +1,8 @@
+-lib craxe
+-D nim-out=./bin/nim/main.nim
+#-D nim-dynamic=enable
+#-D eval-stack
+-D nim-speed=fastest
+-D nim-gc=orc
+build.hxml
+

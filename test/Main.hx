@@ -105,6 +105,13 @@ class SomeGeneric<T> {
 
 typedef SomeAnon = {a: Int, b: String};
 
+class FooBar extends test.a.Foo {
+    override public function bar() {
+        super.bar();
+        trace('FooBar');
+    }
+}
+
 class Main {
 
     static function testGeneric() {
@@ -114,6 +121,8 @@ class Main {
 
     static function testAandB() {
         var a = new test.a.Foo();
+        a.bar();
+        a = new FooBar();
         a.bar();
         var b = new test.b.Foo();
         b.bar();    
@@ -194,8 +203,8 @@ class Main {
         var iteration = 0;
         while( Complex.Length2(val)< MaxRad && iteration < MaxIterations)
         {
-           val = Complex.Add( Complex.Square(val), offset );
-           iteration++;
+            val = Complex.Add( Complex.Square(val), offset );
+            iteration++;
         }
         trace(val.i);
     }

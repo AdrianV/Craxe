@@ -48,11 +48,11 @@ class NimGenerator extends BaseGenerator {
 		sb.add('import craxecore');
 		sb.addNewLine();
 
-		var reqHash = new StringMap<String>();
+		var reqHash = new StringMap<Bool>();
 		for (item in types.classes) {
 			var req = item.classType.meta.getMetaValue(":require");
 			if (req != null)
-				reqHash.set(req, req);
+				reqHash.set(req, true);
 		}
 		for (key => _ in reqHash) {
 			sb.add('import ${key}');
@@ -450,21 +450,21 @@ class NimGenerator extends BaseGenerator {
 	/**
 	 * Build class fields
 	 */
-	function generateClassInfo(sb:IndentStringBuilder, cls:ClassInfo) {
-		var clsName = cls.className;
-		var params = TypeResolver.resolveParameters(cls.params);
+	function generateClassInfo(sb:IndentStringBuilder, cls:ClassInfo, clsName: String) {
+		//var params = TypeResolver.resolveParameters(cls.params);
 
 		var baseTypeName = if (TypeContext.isDynamicSupported(clsName)) {
 			"DynamicHaxeObject";
 		} else {
 			"HaxeObject";
 		}
-
-		var superName = if (cls.classType.superClass != null) {
-			var superType = cls.classType.superClass.t.get();
-			var spname = superType.name;
-			var spParams = TypeResolver.resolveParameters(cls.classType.superClass.params);
-			'${spname}${spParams}';
+		final superCls = cls.classType.superClass;
+		var superName = if (superCls != null) {
+			var superType = superCls.t.get();
+			TypeResolver.resolveClassType(superType, superCls.params);
+			//var spname = superType.name;
+			//var spParams = TypeResolver.resolveParameters(cls.classType.superClass.params);
+			//'${spname}${spParams}';
 		} else {
 			baseTypeName;
 		}
@@ -478,7 +478,7 @@ class NimGenerator extends BaseGenerator {
 
 		var staticFields = cls.classType.statics.get();
 		if (staticFields.length > 0) {
-			var line = '${cls.className}Static = object of HaxeObject';
+			var line = '${clsName}Static = object of HaxeObject';
 			sb.add(line);
 			sb.addNewLine(Same);
 			//sb.addNewLine(Same, true);
@@ -514,12 +514,11 @@ class NimGenerator extends BaseGenerator {
 	/**
 	 * Build static class initialization
 	 */
-	function generateStaticClassInit(sb:IndentStringBuilder, cls:ClassInfo) {
+	function generateStaticClassInit(sb:IndentStringBuilder, cls:ClassInfo, clsName: String) {
 		var staticFields = cls.classType.statics.get();
 		if (staticFields.length < 1)
 			return;
 
-		var clsName = cls.className;
 		var hasStaticMethod = false;
 		var hasStaticVar = false;
 		for (field in staticFields) {
@@ -535,7 +534,7 @@ class NimGenerator extends BaseGenerator {
 			}
 		}
 
-		if (hasStaticMethod || hasStaticVar) {
+		if (hasStaticVar) {
 			sb.add('let ${clsName}StaticInst = ${clsName}Static(');
 			if (hasStaticVar) {
 				var first = true;
@@ -611,7 +610,7 @@ class NimGenerator extends BaseGenerator {
 			return;
 
 		var constructor = cls.classType.constructor.get();
-		var className = cls.className;
+		final clsName = getClassName(cls);
 		var superName:String = null;
 		var superConstructor:ClassField = null;
 
@@ -626,19 +625,19 @@ class NimGenerator extends BaseGenerator {
 			case [TFun(_, _), TFunction(tfunc)]:
 				MethodExpressionGenerator.scopes.newScope();
 				var params = TypeResolver.resolveParameters(cls.params);
-				final supportsDynamic = TypeContext.isDynamicSupported(className);
+				final supportsDynamic = TypeContext.isDynamicSupported(clsName);
 				// Generate procedures for dynamic support
 				if (supportsDynamic) {
 					var fields = cls.classType.fields.get();
 
-					sb.add('proc getFields(this:${className}):HaxeArray[system.string] {.inline.} =');
+					sb.add('proc getFields(this:${clsName}):HaxeArray[system.string] {.inline.} =');
 					sb.addNewLine(Inc);
 					var fldNames = fields.map(x -> '"${x.name}"').join(", ");
 					sb.add('return HaxeArray[system.string](data: @[${fldNames}])');
 
 					sb.addBreak();
 					
-					sb.add('proc getFieldByNameInternal${params}(this:${className}, name:system.string):Dynamic =');
+					sb.add('proc getFieldByNameInternal${params}(this:${clsName}, name:system.string):Dynamic =');
 					sb.addNewLine(Inc);
 					if (fields.length > 0) {
 						sb.add("case name");
@@ -653,9 +652,9 @@ class NimGenerator extends BaseGenerator {
 					}
 					sb.addBreak();
 
-					sb.add('proc fromDynamic${params}(this:Dynamic):${className} =');
+					sb.add('proc fromDynamic${params}(this:Dynamic):${clsName} =');
 					sb.addNewLine(Inc);
-					sb.add('cast[${className}](this.fclass)');
+					sb.add('cast[${clsName}](this.fclass)');
 					sb.addBreak();
 				}
 				final isPure = constructorIsPure(constrExp);
@@ -665,16 +664,16 @@ class NimGenerator extends BaseGenerator {
 				if (! isPure || supportsDynamic) {
 					// Generate constructor
 					MethodExpressionGenerator.scopes.newScope();
-					sbCon.add('proc new${className} (');
+					sbCon.add('proc new${clsName} (');
 					sbCon.add(sbArgs.toString());
-					sbCon.add(') : ${className} {.inline.}');
+					sbCon.add(') : ${clsName} {.inline.}');
 					sb.add(sbCon.toString());
 				} else {
-					sb.add('proc new${className}(');
+					sb.add('proc new${clsName}(');
 					sb.add(sbArgs.toString());
-					sb.add(') : ${className} =');
+					sb.add(') : ${clsName} =');
 					sb.addNewLine(Inc);
-					sb.add('${className}(kind: THaxe, ');
+					sb.add('${clsName}(kind: THaxe, ');
 					cls.constrParams = buildPureConstructor(sb, constrExp);
 					sb.add(")");
 					sb.addNewLine(Dec);
@@ -684,7 +683,7 @@ class NimGenerator extends BaseGenerator {
 
 				// Generate init proc for haxe "super(params)"
 				MethodExpressionGenerator.scopes.newScope();
-				sb.add('proc init${className}(this:${className}');
+				sb.add('proc init${clsName}(this:${clsName}');
 				if (tfunc.args.length > 0) {
 					sb.add(", ");
 					sb.add(sbArgs.toString());
@@ -706,9 +705,9 @@ class NimGenerator extends BaseGenerator {
 					sbCon.add(" =");
 					sb.add(sbCon.toString());
 					sb.addNewLine(Inc);
-					sb.add('var this = ${className}()');
+					sb.add('var this = ${clsName}()');
 					sb.addNewLine(Same);
-					sb.add('init${className}(this');
+					sb.add('init${clsName}(this');
 					if (tfunc.args.length > 0) {
 						sb.add(", ");
 						sb.add(tfunc.args.map(x -> MethodExpressionGenerator.scopes.getVarName(x.v.name, x.v.id)).join(", "));
@@ -742,8 +741,10 @@ class NimGenerator extends BaseGenerator {
 		switch [expr.t, expr.expr] {
 			case [TFun(_, ret), TFunction(tfunc)]:
 				MethodExpressionGenerator.scopes.newScope();
-				var clsName = !isStatic ? cls.className : '${cls.className}Static';
-				sb.add('proc ${method.name}(this:${clsName}');
+				var clsName = (isStatic ? 'typedesc[' : '') + getClassName(cls) + (!isStatic ? '' : 'Static]');
+				final mi = ClassInfo.methodInfo.get('${method.pos}');
+				final smethod = mi != null ? 'method' : 'proc';
+				sb.add('${smethod} ${method.name}(this:${clsName}');
 				var anons = null;
 				if (tfunc.args.length > 0) {
 					sb.add(", ");
@@ -751,6 +752,8 @@ class NimGenerator extends BaseGenerator {
 				}
 				sb.add(") : ");
 				sb.add(TypeResolver.resolve(ret));
+				if (mi != null && mi == Base)
+					sb.add(" {.base.}");
 				sb.add(" =");
 				sb.addNewLine(Inc);
 				if (anons != null && anons.length > 0) 
@@ -818,7 +821,7 @@ class NimGenerator extends BaseGenerator {
 
 		for (method in cls.staticMethods) {
 			switch (cls.classType.kind) {
-				case KNormal:
+				case KNormal | KModuleFields(_):
 					generateClassMethod(sb, cls, method, true);
 				case KAbstractImpl(a):
 					generateMethodAbstract(sb, cls, a.get(), method, true);
@@ -827,18 +830,25 @@ class NimGenerator extends BaseGenerator {
 			}
 		}
 
-		// Generate heplers
+		// Generate helpers
 		switch cls.classType.kind {
-			case KNormal:
-				var clsName = cls.className;
+			case KNormal | KModuleFields(_):
+				final clsName = getClassName(cls);
 				var params = TypeResolver.resolveParameters(cls.params);
 				sb.add('proc `$`$params(this:${clsName}) : system.string {.inline.} = ');
 				sb.addNewLine(Inc);
 				sb.add('return "${clsName}"' + " & $this[]");
 				sb.addBreak();
-			case KAbstractImpl(_):
+				case KAbstractImpl(_):
 			case v:
 				throw 'Unsupported ${v}';
+		}
+	}
+
+	inline function getClassName(c: ClassInfo) {
+		return switch c.classType.kind {
+			case KModuleFields(module): module;
+			case _: c.className;
 		}
 	}
 
@@ -883,9 +893,11 @@ class NimGenerator extends BaseGenerator {
 				if (!c.classType.isInterface) {
 					switch (c.classType.kind) {
 						case KNormal:
-							generateClassInfo(sb, c);
+							generateClassInfo(sb, c, c.className);
 						case KAbstractImpl(a):
 							generateAbstractImpl(sb, c, a.get());
+						case KModuleFields(module):
+							generateClassInfo(sb, c, module);
 						case v:
 							throw 'Unsupported ${v}';
 					}
@@ -901,8 +913,10 @@ class NimGenerator extends BaseGenerator {
 				if (!c.classType.isInterface) {
 					switch (c.classType.kind) {
 						case KNormal:
-							generateStaticClassInit(sb, c);
+							generateStaticClassInit(sb, c, c.className);
 						case KAbstractImpl(_):
+						case KModuleFields(module):
+							generateStaticClassInit(sb, c, module);
 						case v:
 							throw 'Unsupported ${v}';
 					}
@@ -920,9 +934,9 @@ class NimGenerator extends BaseGenerator {
 	 */
 	function buildEntryPointMain(sb:IndentStringBuilder, entryPoint:EntryPointInfo) {
 		sb.addNewLine(None);
-		var clsName = entryPoint.classInfo.className;
+		var clsName = getClassName(entryPoint.classInfo);
 		var methodName = entryPoint.method.name;
-		sb.add('${clsName}StaticInst.${methodName}()');
+		sb.add('${clsName}Static.${methodName}()'); // was StaticInst
 	}
 
 	public function new(processed:PreprocessedTypes) {
