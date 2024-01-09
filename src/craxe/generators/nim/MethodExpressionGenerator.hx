@@ -116,6 +116,19 @@ class MethodExpressionGenerator {
 	var returnType:Type;
 
 	public static final scopes = new VarInScope();
+	var reqHash = new Map<String, Bool>();
+
+	public function requiredModules(): Array<String> {
+		final res = [for (m => r in reqHash) if (r) m];
+		return res;
+	}
+
+	inline function checkRequired(meta: MetaAccess) {
+		final req = meta.getMetaValue(":require");
+		if (req != null) {
+			reqHash.set(req, true);
+		}
+	}
 
 	/**
 	 * Generate code for TMeta
@@ -482,6 +495,7 @@ class MethodExpressionGenerator {
 	 */
 	function generateTNew(sb:IndentStringBuilder, classType:ClassType, params:Array<Type>, elements:Array<TypedExpr>) {
 		var typeName = TypeResolver.resolveClassType(classType, params);
+		checkRequired(classType.meta);
 		//var typeParams = TypeResolver.resolveParameters(params);
 		var isPure = false;
 		var clsInfo: ClassInfo = null;
@@ -741,6 +755,10 @@ class MethodExpressionGenerator {
 					generateTBinop(sb, op, e1, e2);
 				case [TTypeExpr(m), _]:
 					trace(m);
+				case [TCast(e, m), t]:
+					generateTCast(sb, toExpr, e, m);
+				//case [TInst(t, params), _]:
+				//	trace(t);
 				case [v, _]:
 					throw 'Unsupported ${v}';
 			}
@@ -762,6 +780,8 @@ class MethodExpressionGenerator {
 					generateInnerExpr();
 				}
 			case TAbstract(_.get().name => "Null" , _):
+				generateInnerExpr();
+			case TAbstract(_, _):
 				generateInnerExpr();
 			case _:
 				final fromType = TypeResolver.resolve(fromExpr.t);
@@ -1132,7 +1152,7 @@ class MethodExpressionGenerator {
 	/**
 	 * Generate code for anon field call
 	 */
-	 function generateTCallTFieldFAnon(sb:IndentStringBuilder, classField:ClassField) {
+	function generateTCallTFieldFAnon(sb:IndentStringBuilder, classField:ClassField) {
 		var fieldName = classField.name;
 		sb.add(fieldName);
 	}
@@ -1795,7 +1815,12 @@ class MethodExpressionGenerator {
 				sb.add("block:");
 				sb.addNewLine(Inc);	
 			}
-			for (expr in expressions) {
+			for (x => expr in expressions) {
+				if (expr.expr.match(TLocal(_))) { // hacky way to filter out unnecessary local variable which should be discarded
+					//trace('$isBody $x from ${expressions.length}');
+					//trace('$expr');
+					if (x < expressions.length - 1) continue;
+				}
 				generateTBlockSingleExpression(sb, expr);
 			}
 			if ( ! isBody) {

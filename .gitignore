@@ -6,3 +6,5 @@ out
 bin
 core/src/tools/tokenhash
 test/benchmarks/mandelbrot/bin/nim/main
+test/benchmarks/mandelbrot/bin/nim/main
+core/tests/httpservertest

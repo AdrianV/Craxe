@@ -108,7 +108,7 @@ typedef SomeAnon = {a: Int, b: String};
 class FooBar extends test.a.Foo {
     override public function bar() {
         super.bar();
-        trace('FooBar');
+        trace('and a FooBar');
     }
 }
 
@@ -216,6 +216,21 @@ class Main {
         trace(a);    
     } 
 
+    #if (true)
+    static function testMap() {
+        var m = new Map();
+        m.set('foo', 'bar');
+        m.set('bar', 'foo');
+        trace(m.get('foo'));
+        var m2 = m.copy();
+        $type(m2);
+        m.clear();
+        trace(m.exists('foo'));
+        trace(m2.exists('bar'));
+        trace(m2);
+    }
+    #end
+
     static function testEnumExpr() {
         var e = Some("23");
         trace((switch e {
@@ -240,6 +255,12 @@ class Main {
         Tool.assert(i == 1, "foo");     
     }
 
+    static function testSys() {
+        Sys.println('Hallo Welt');
+        trace(Sys.args());
+        Sys.println(Sys.getEnv('PATH'));
+    }
+
     static function main() {
         testClosure();
         testUgly();
@@ -252,5 +273,7 @@ class Main {
         testAnon();
         testAandB();
         testGeneric();
+        testSys();
+        testMap();
     }
 }

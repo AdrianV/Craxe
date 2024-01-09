@@ -34,12 +34,13 @@ class NimGenerator extends BaseGenerator {
 	/**
 	 * Add code helpers to header
 	 */
+	var reqHash = new StringMap<Bool>();
 	function addCodeHelpers(sb:IndentStringBuilder) {
 		var header = ContextMacro.getDefines().get("source-header");
 
 		sb.add('# ${header}');
 		sb.addNewLine();
-		sb.add('# Hail to Mighty CRAXE!!!');
+		sb.add('# compiled by xnim');
 		sb.addNewLine();
 		sb.addNewLine(None, true);
 		sb.add('{.experimental: "codeReordering".}');
@@ -48,17 +49,20 @@ class NimGenerator extends BaseGenerator {
 		sb.add('import craxecore');
 		sb.addNewLine();
 
-		var reqHash = new StringMap<Bool>();
 		for (item in types.classes) {
 			var req = item.classType.meta.getMetaValue(":require");
 			if (req != null)
 				reqHash.set(req, true);
 		}
-		for (key => _ in reqHash) {
-			sb.add('import ${key}');
-			sb.addNewLine();
+		function importRequired(ind) {
+			var s = "";
+			for (key => _ in reqHash) {
+				if (ind != null) s += sb.calcIndent(ind);
+				s += 'import ${key}\n';
+			}
+			return s;
 		}
-
+		sb.addCallback(importRequired);
 		sb.addBreak();
 	}
 
@@ -974,6 +978,8 @@ class NimGenerator extends BaseGenerator {
 		}
 
 		var buff = new StringBuf();
+
+		for (m in methodBodyGenerator.requiredModules()) reqHash.set(m, true);
 		buff.add(headerSb.toString());
 		buff.add(codeSb.toString());
 

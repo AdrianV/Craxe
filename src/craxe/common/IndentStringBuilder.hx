@@ -17,7 +17,7 @@ enum BufferItem {
 	Data(s:String);
 	Line(v:IndentType);
 	Indent(v:IndentType);
-	Call(cb: Void->String);
+	Call(cb: Int->String, ind: Int);
 }
 
 /**
@@ -39,10 +39,12 @@ class IndentStringBuilder {
 	 */
 	var buffer:Array<BufferItem>;
 
+	#if (false)
 	/**
 	 * Indent string
 	 */
 	var indentStr:String;
+	#end
 
 	/**
 	 * Current indent
@@ -61,7 +63,7 @@ class IndentStringBuilder {
 	/**
 	 * Calculate indent string
 	 */
-	private function calcIndent(ind:Int):String {
+	public function calcIndent(ind:Int):String {
 		var indStr = "";
 		for (i in 0...ind * indentSize)
 			indStr += " ";
@@ -76,7 +78,7 @@ class IndentStringBuilder {
 		this.indentSize = indentSize;
 		buffer = new Array<BufferItem>();
 		indent = 0;
-		indentStr = "";
+		// indentStr = "";
 	}
 
 	/**
@@ -135,6 +137,14 @@ class IndentStringBuilder {
 	}
 
 	/**
+	 * Add a lazy callback
+	 * @param cb lazy callback
+	 */
+	public inline function addCallback(cb: Int->String) {
+		buffer.push(Call(cb, indent));
+	}
+
+	/**
 	 * Return string
 	 */
 	public inline function toString() {
@@ -178,8 +188,8 @@ class IndentStringBuilder {
 				case Indent(v):
 					state = 3;
 					proccIndent(v);
-				case Call(cb):
-					addData(cb());
+				case Call(cb, ind):
+					addData(cb(ind));
 			}
 		}
 

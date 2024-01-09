@@ -156,7 +156,7 @@ when false:
     template `+`*(s1:string, s2:string): string =
         s1 & s2
 
-template toString*(this:untyped):string =
+proc toString*[T](this: T):string =
     $this
 
 # String
@@ -227,6 +227,8 @@ proc `==`*(v1:HaxeObjectRef, v2:HaxeObjectRef):bool =
     v1.hash() == v2.hash()
 
 template `==`*[T: ValueType](v1:Null[T], v2:Null[T]):bool =
+    let v1 = v1
+    let v2 = v2
     return if not v1.isNil and not v2.isNil : v1.value == v2.value else : v1.isNil and v2.isNil
 
 # Scoped block
@@ -303,7 +305,7 @@ proc `iterator`*[T](this:HaxeArray[T]):HaxeIterator[T] =
 
 # --- Haxe Map --- 
 
-const TABLE_INIT_SIZE = 64
+const TABLE_INIT_SIZE = 32
 
 # Haxe Map
 template set*[K, V](this:HaxeMap[K, V], key:K, value:V) =
@@ -311,9 +313,9 @@ template set*[K, V](this:HaxeMap[K, V], key:K, value:V) =
 
 proc get*[K](this:HaxeMap[K, ValueType], key:K):Null[ValueType] =    
     if this.data.hasKey(key):
-        return Null[ValueType](has: true, value: this.data[key])
+        return Null[ValueType](value: this.data[key])
     else:
-        return Null[ValueType](has: false)
+        return nil
 
 template get*[K, V](this:HaxeMap[K, V], key:K):V =
     if this.data.hasKey(key):
@@ -336,6 +338,7 @@ proc newObjectMap*[K, V]() : HaxeObjectMap[K, V] =
     result = HaxeObjectMap[K, V]()
     result.data = initTable[K, V](TABLE_INIT_SIZE)
 
+    
 # --- Dynamic ---
 
 # AnonObject
