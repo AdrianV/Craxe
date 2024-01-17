@@ -80,9 +80,9 @@ type
     HaxeMap*[K, V] = ref object of HaxeObject
         data*:Table[K, V]
 
-    HaxeKeyValue*[K,V] = ref object of HaxeObject
-        key*: K
-        value*: V
+    # HaxeKeyValue*[K,V] = ref object of HaxeObject
+    #    key*: K
+    #    value*: V
 
     # when false :
     #    HaxeKeyValueWrapper*[K, V] = ref object of DynamicHaxeObject

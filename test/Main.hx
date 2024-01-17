@@ -238,7 +238,7 @@ class Main {
         trace(m2);
         for (v in m2) trace(v);
         for (k in m2.keys()) trace(k);
-        //for (k => v in m2) trace('$k => $v');
+        for (k => v in m2) trace('$k => $v');
     }
     #end
 

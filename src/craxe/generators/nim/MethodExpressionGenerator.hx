@@ -1432,7 +1432,7 @@ class MethodExpressionGenerator {
 						final tt = TypeResolver.resolve(farg.t);
 						final ft = TypeResolver.resolve(expr.t);
 						if (ft != tt && tt != "Dynamic") {
-							trace('from $ft to $tt');
+							//trace('from $ft to $tt');
 							sb.add('to${tt}(');
 							wasConverter = true;
 						}
@@ -1441,7 +1441,7 @@ class MethodExpressionGenerator {
 							switch expr.t {
 								case TDynamic(_):
 								case TAnonymous(a), TType(_.get().type => TAnonymous(a),_):
-									//trace("from: " + TypeResolver.resolve(farg.t) + " to: " + TypeResolver.resolve(expr.t));
+									//trace("from: " + TypeResolver.resolve(expr.t) + " to: " + TypeResolver.resolve(farg.t));
 								case TType(_, _):
 								case _:
 									sb.add('toDynamic(');
