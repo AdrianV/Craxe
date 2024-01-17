@@ -4,6 +4,11 @@ Each target generates 2 outputs - one that uses classes and one that uses anonym
 
 Usage:
 ```
+haxe compile-nim.hxml
+./bin/nim/main
+./bin/nim/main_anon
+# currently the version for anonymous objects is faster in nim
+
 haxe compile-cpp.hxml
 ./bin/cpp/Mandelbrot
 ./bin/cpp-anon/Mandelbrot
