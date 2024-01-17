@@ -106,11 +106,12 @@ class NimGenerator extends BaseGenerator {
 		for (i => arg in args) {
 			final name = MethodExpressionGenerator.scopes.createVar(arg.v, true);
 			final tn = TypeResolver.resolve(arg.v.t);
-			sb.add('$name: $tn');
 			switch arg.v.t {
-				case TAnonymous(a):
+				case TAnonymous(a), TType(_.get().type => TAnonymous(a),_):
 					anons.push({i: i, name: name});
-				case _:
+					sb.add('$name: ${tn} | ${tn}Wrapper');
+				case var tt: 
+					sb.add('$name: $tn');
 			}
 			if (arg.value != null) switch arg.value.expr {
 				case null:
@@ -344,9 +345,9 @@ class NimGenerator extends BaseGenerator {
 			}
 			sb.addNewLine(Dec);
 			sb.addNewLine(Same, true);
-			sb.add('${an.name}Wrapper = ref object of DynamicHaxeObject');
+			sb.add('${an.name}Wrapper = ref object of DynamicHaxeWrapper');
 			sb.addNewLine(Inc);
-			sb.add('instance: DynamicHaxeObjectRef');
+			//sb.add('instance: DynamicHaxeObjectRef');
 			sb.addNewLine(Same);
 			for (fld in an.fields) {
 				var ftp = TypeResolver.resolve(fld.type);
@@ -371,9 +372,10 @@ class NimGenerator extends BaseGenerator {
 		for (an in anons) {
 			var anonName = an.name;
 
-			sb.add('converter to$anonName* [T:DynamicHaxeObjectRef](v: T): $anonName {.inline} =');
+			sb.add('converter to$anonName* [T:DynamicHaxeObjectRef](v: T): ${anonName}Wrapper {.inline} =');
+			//sb.add('converter to$anonName* [T: ${anonName}](v: T): ${anonName}Wrapper {.inline} =');
 			sb.addNewLine(Inc);
-			sb.add('cast[$anonName](${anonName}Wrapper(kind: TAnonWrapper, fields: v.fields, instance: v');
+			sb.add('${anonName}Wrapper(kind: TAnonWrapper, fields: v.fields, instance: v');
 			var first = true;
 			for (f in an.fields) {
 				if (first)
@@ -384,17 +386,17 @@ class NimGenerator extends BaseGenerator {
 				first = false;
 			}
 			if (!first) sb.addNewLine(Dec);
-			sb.add("))");
+			sb.add(")");
 
 			sb.addBreak();
 
-			sb.add('converter to$anonName* (v: Dynamic): $anonName =');
+			sb.add('converter to$anonName* (v: Dynamic): ${anonName}Wrapper =');
 			sb.addNewLine(Inc);
 			sb.add('case v.kind:');
 			sb.addNewLine(Same);
-			sb.add('of TClass:');
+			sb.add('of TAnon:');
 			sb.addNewLine(Inc);
-			sb.add('cast[$anonName](${anonName}Wrapper(kind: TAnonWrapper, fields: v.fclass.fields, instance: v.fclass');
+			sb.add('${anonName}Wrapper(kind: TAnonWrapper, fields: v.fanon.fields, instance: v.fanon');
 			var first = true;
 			for (f in an.fields) {
 				if (first)
@@ -402,11 +404,11 @@ class NimGenerator extends BaseGenerator {
 				else
 					sb.addNewLine(Same);
 				final tn = TypeResolver.resolve(f.type);
-				sb.add(', ${f.name}: adr[$tn](v.fclass, "${f.name}")');
+				sb.add(', ${f.name}: adr[$tn](v.fanon, "${f.name}")');
 				first = false;
 			}
 			if (!first) sb.addNewLine(Dec);
-			sb.add("))");
+			sb.add(")");
 			sb.addNewLine(Dec);
 			sb.add('else: raise newException(ValueError, "not an anon")');		
 			sb.addBreak();
@@ -658,7 +660,7 @@ class NimGenerator extends BaseGenerator {
 
 					sb.add('proc fromDynamic${params}(this:Dynamic):${clsName} =');
 					sb.addNewLine(Inc);
-					sb.add('cast[${clsName}](this.fclass)');
+					sb.add('cast[${clsName}](this.fanon)');
 					sb.addBreak();
 				}
 				final isPure = constructorIsPure(constrExp);
@@ -677,7 +679,7 @@ class NimGenerator extends BaseGenerator {
 					sb.add(sbArgs.toString());
 					sb.add(') : ${clsName} =');
 					sb.addNewLine(Inc);
-					sb.add('${clsName}(kind: THaxe, ');
+					sb.add('${clsName}(kind: TAnon, ');
 					cls.constrParams = buildPureConstructor(sb, constrExp);
 					sb.add(")");
 					sb.addNewLine(Dec);

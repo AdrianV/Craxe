@@ -514,7 +514,7 @@ class MethodExpressionGenerator {
 
 		sb.add(varTypeName);
 		sb.add("(");
-		if (isPure) sb.add('kind: THaxe');
+		if (isPure) sb.add('kind: TAnon');
 		var isFirst = ! isPure;
 		for (i in 0 ... elements.length) {
 			if (! isFirst) sb.add(', ');
@@ -705,7 +705,7 @@ class MethodExpressionGenerator {
 			}));
 		}
 
-		sb.add('${object.name}(kind: THaxe');
+		sb.add('${object.name}(kind: TAnon');
 		for (field in fields) {
 			sb.add(', ${field.name}: ');
 			switch field.expr.expr {
@@ -746,7 +746,7 @@ class MethodExpressionGenerator {
 					generateTObjectDecl(sb, fields);
 				case [TField(e, fa), TFun(_, _)]:
 					final ft = TypeResolver.resolve(fromExpr.t);
-					trace(ft);
+					//trace(ft);
 					sb.add('$ft = ');
 					generateTField(sb, e, fa);
 				case [TField(e, fa), _]:
@@ -813,11 +813,12 @@ class MethodExpressionGenerator {
 			for (i => x in largs) {
 				if (i > 0) args += ", ";
 				final tn = TypeResolver.resolve(x.t);
-				args += '${x.name}:$tn';
 				switch x.t {
 					case TAnonymous(a):
 						anons.push({i:i, name: x.name});
+						args += '${x.name}:${tn}Wrapper';
 					case _:
+						args += '${x.name}:$tn';
 				}
 			}
 		}
@@ -1154,7 +1155,7 @@ class MethodExpressionGenerator {
 	 */
 	function generateTCallTFieldFAnon(sb:IndentStringBuilder, classField:ClassField) {
 		var fieldName = classField.name;
-		sb.add(fieldName);
+		sb.add('.$fieldName');
 	}
 
 	/**
@@ -1400,7 +1401,7 @@ class MethodExpressionGenerator {
 				generateTLocal(sb, v);
 				sb.add("(");
 			case TIdent(s):
-				trace('dont know waht to do with $s');
+				trace('dont know what to do with $s');
 			case v:
 				throw 'Unsupported ${v}';
 		}
@@ -1427,10 +1428,21 @@ class MethodExpressionGenerator {
 							sb.add('to${tp.name}(');
 							wasConverter = true;
 						}
+					case TAnonymous(a), TType(_.get().type => TAnonymous(a), _):
+						final tt = TypeResolver.resolve(farg.t);
+						final ft = TypeResolver.resolve(expr.t);
+						if (ft != tt && tt != "Dynamic") {
+							trace('from $ft to $tt');
+							sb.add('to${tt}(');
+							wasConverter = true;
+						}
 					case TDynamic(_) | TType(_, _):
 						if (!isTraceCall) {
 							switch expr.t {
-								case TDynamic(_) | TType(_) | TAnonymous(_):
+								case TDynamic(_):
+								case TAnonymous(a), TType(_.get().type => TAnonymous(a),_):
+									//trace("from: " + TypeResolver.resolve(farg.t) + " to: " + TypeResolver.resolve(expr.t));
+								case TType(_, _):
 								case _:
 									sb.add('toDynamic(');
 									wasConverter = true;

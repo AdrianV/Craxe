@@ -3,6 +3,7 @@
 -D nim-dynamic=enable
 -D nim-speed=debug
 -D nim-extra=-r
+#--class-path test
 --main test.Main
 -D analyzer-optimize
 

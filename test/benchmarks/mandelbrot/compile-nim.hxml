@@ -11,3 +11,4 @@
 --next
 -D nim-out=./bin/nim/main_anon.nim
 -D anon_objects
+-D anon_fair

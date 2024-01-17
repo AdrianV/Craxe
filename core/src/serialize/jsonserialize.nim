@@ -35,13 +35,14 @@ proc printObject(obj:Dynamic):string =
 proc parseNode(node:JsonNode):Dynamic =
     case node.kind
     of JObject:
-        var keys = toSeq(node.fields.keys)        
-        var res = newAnonObject(keys)
-        var i = 0        
+        var res = DynamicHaxeObjectRef()
+        # var keys = toSeq(node.fields.keys)        
+        # var res = newAnonObject(keys)
+        # var i = 0        
         for key, val in node.fields.pairs():
-            res{i} = parseNode(val)
-            inc(i)
-        return toDynamic(res)
+            res.setFieldByName(key, parseNode(val))
+            # inc(i)
+        return Dynamic(kind:TAnon, fanon: res)
     of JString:
         return toDynamic(node.getStr())
     of JInt:
@@ -60,7 +61,7 @@ proc doParse*(this:JsonParser):Dynamic =
 
 proc print*(this:JsonPrinterStatic, value:Dynamic, replacer:pointer = nil, space:pointer = nil):string =    
     case value.kind
-    of TAnonObject, TClass:
+    of TAnon, TClass:
         return printObject(value)
     else:
         raise newException(ValueError, "Unsupported Dynamic type")

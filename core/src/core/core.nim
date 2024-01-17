@@ -14,16 +14,16 @@ type
 
     # Dynamic
     DynamicType* = enum
-        THaxe, TAnonWrapper, TString, TInt, TFloat, TBool, TAnonObject, TClass, TPointer
+        THaxe, TAnonWrapper, TString, TInt, TFloat, TBool, TAnon, TClass, TPointer
 
     # --- AnonNextGen ---
 
     AnonNextGenType* = enum
-        atStaticBool, atStaticInt, atStaticFloat, atStaticString, atStaticArray, atStaticAnon, atStaticInstance, atDynamic
+        atStaticBool, atStaticInt, atStaticFloat, atStaticString, atStaticArray, atStaticAnon, atStaticAnonWrapper, atStaticInstance, atDynamic
 
     AnonNextGen* = object
         case fanonType*: AnonNextGenType
-        of atStaticBool, atStaticInt, atStaticFloat, atStaticString, atStaticArray, atStaticAnon, atStaticInstance:
+        of atStaticBool, atStaticInt, atStaticFloat, atStaticString, atStaticArray, atStaticAnon, atStaticAnonWrapper, atStaticInstance:
             fstatic*: pointer
         of atDynamic:
             fdynamic*: Dynamic
@@ -50,10 +50,15 @@ type
     NullAbstr*[T] = Null[T]
 
     # Dynamic object with access to fields by name
-    DynamicHaxeObject* = object of HaxeObject
+    DynamicHaxeObjectBase* = object of HaxeObject
         fields*: FieldTable
 
+    DynamicHaxeObject* = object of DynamicHaxeObjectBase
+
     DynamicHaxeObjectRef* = ref DynamicHaxeObject
+
+    DynamicHaxeWrapper* = ref object of DynamicHaxeObjectBase
+        instance*: DynamicHaxeObjectRef
 
     # --- Haxe Iterator ---
     HaxeIterator*[T] = ref object of DynamicHaxeObject
@@ -75,6 +80,16 @@ type
     HaxeMap*[K, V] = ref object of HaxeObject
         data*:Table[K, V]
 
+    HaxeKeyValue*[K,V] = ref object of HaxeObject
+        key*: K
+        value*: V
+
+    # when false :
+    #    HaxeKeyValueWrapper*[K, V] = ref object of DynamicHaxeObject
+    #        instance: DynamicHaxeObjectRef
+    #        key: ptr K
+    #        value: ptr V
+
     # Haxe String map
     HaxeStringMap*[T] = HaxeMap[string, T]
 
@@ -90,9 +105,6 @@ type
         name*:string
         value*:Dynamic
 
-    # Haxe anonimous object
-    AnonObject* = seq[AnonField]
-
     # Dynamic proxy for real object
     DynamicHaxeObjectProxy*[T] = object of DynamicHaxeObject
         obj*:T
@@ -101,7 +113,7 @@ type
 
     Dynamic* = ref object 
         case kind*: DynamicType
-        of THaxe, TAnonWrapper: discard
+        of THaxe: discard
         of TString: 
             fstring*: system.string
         of TInt: 
@@ -110,10 +122,12 @@ type
             ffloat*:float
         of TBool:
             fbool*: bool
-        of TAnonObject: 
-            fanon*: AnonObject
+        of TAnonWrapper:
+            fwrapper: DynamicHaxeWrapper
+        of TAnon: 
+            fanon*: DynamicHaxeObjectRef
         of TClass: 
-            fclass*: DynamicHaxeObjectRef
+            fclass*: HaxeObjectRef
         of TPointer:
             fpointer*: pointer
 
@@ -157,7 +171,7 @@ when false:
         s1 & s2
 
 proc toString*[T](this: T):string =
-    $this
+    this.repr
 
 # String
 template length*(this:string) : int =
@@ -341,52 +355,56 @@ proc newObjectMap*[K, V]() : HaxeObjectMap[K, V] =
     
 # --- Dynamic ---
 
-# AnonObject
-proc newAnonObject*(names: seq[string]) : AnonObject {.inline.}  =
-    result = newSeqOfCap[AnonField](names.len)    
-    for i in 0..<names.len:
-        result.add(AnonField(name: names[i]))
+when false:
+    # AnonObject
+    proc newAnonObject*(names: seq[string]) : AnonObject {.inline.}  =
+        result = newSeqOfCap[AnonField](names.len)    
+        for i in 0..<names.len:
+            result.add(AnonField(name: names[i]))
 
-template newAnonObject*(fields: seq[AnonField]) : AnonObject =
-    fields
+    template newAnonObject*(fields: seq[AnonField]) : AnonObject =
+        fields
 
-proc newAnonField*(name:string, value:Dynamic) : AnonField {.inline.} =
-    AnonField(name : name, value : value)
+    proc newAnonField*(name:string, value:Dynamic) : AnonField {.inline.} =
+        AnonField(name : name, value : value)
 
-proc `{}=`*[T](this:AnonObject, pos:int, value:T) {.inline.} =
-    this[pos].value = value
+    proc `{}=`*[T](this:AnonObject, pos:int, value:T) {.inline.} =
+        this[pos].value = value
 
-proc `{}=`*[T](this:AnonObject, name:string, value:T) {.inline.} =
-    for fld in this:
-        if fld.name == name:
-            fld.value = value
+    proc `{}=`*[T](this:AnonObject, name:string, value:T) {.inline.} =
+        for fld in this:
+            if fld.name == name:
+                fld.value = value
 
-template `{}`*(this:AnonObject, pos:int):Dynamic =
-    this[pos].value
+    template `{}`*(this:AnonObject, pos:int):Dynamic =
+        this[pos].value
 
-proc `{}`*(this:AnonObject, name:string):Dynamic =
-    if this.len < 1:
+    proc `{}`*(this:AnonObject, name:string):Dynamic =
+        if this.len < 1:
+            return nil
+
+        for fld in this:
+            if fld.name == name:
+                return fld.value
+
         return nil
-
-    for fld in this:
-        if fld.name == name:
-            return fld.value
-
-    return nil
-
-proc getFields*(this:AnonObject):HaxeArray[string] =
-    result = HaxeArray[string]()
-    for f in this:
-        discard result.push(f.name)
 
 proc getFields* (this: DynamicHaxeObjectRef): HaxeArray[string] =
     result = HaxeArray[string]()
     for f in this.fields:
         discard result.push($f.thash)
 
-proc getFieldByName* (this: DynamicHaxeObjectRef, name:string): Dynamic {.gcsafe.}
+proc getFieldByName* (this: DynamicHaxeObjectRef | DynamicHaxeWrapper, name:string): Dynamic {.gcsafe.}
 
-proc setFieldByName* (this: DynamicHaxeObjectRef, name:string, value:Dynamic):void 
+proc setFieldByName* (this: DynamicHaxeObjectRef | DynamicHaxeWrapper, name:string, value:Dynamic):void 
+
+when false:
+    template typ[T](v: DynamicHaxeWrapper[T]): typedesc = T
+
+    template makeDynamic*(value:DynamicHaxeWrapper[T]) =
+        if value.instance.fields.len == 0: 
+            makeDynamic(cast[T](value.instance))
+            # fields = value.instance.fields
 
 template checkDynamic*[T:DynamicHaxeObjectRef](value:T) =
     mixin makeDynamic
@@ -399,11 +417,12 @@ template toDynamic*(f: AnonNextGen): Dynamic =
     of atStaticFloat: Dynamic(kind: TFloat, ffloat: cast[ptr float](f.fstatic)[])
     of atStaticString: Dynamic(kind: TString, fstring: cast[ptr string](f.fstatic)[])
     of atStaticArray: nil # TODO 
-    of atStaticAnon: Dynamic(kind: TClass, fclass: cast[ptr DynamicHaxeObjectRef](f.fstatic)[])
+    of atStaticAnon: Dynamic(kind: TAnon, fanon: cast[ptr DynamicHaxeObjectRef](f.fstatic)[])
+    of atStaticAnonWrapper: Dynamic(kind: TAnonWrapper, fwrapper: cast[ptr DynamicHaxeWrapper](f.fstatic)[])
     of atStaticInstance: nil # TODO
     of atDynamic: f.fdynamic
 
-proc toString[T:DynamicHaxeObjectRef](this:T): string
+proc toString* [T:DynamicHaxeObjectRef](this:T): string
 
 template `$`*[T:DynamicHaxeObjectRef](this:T): string =
     checkDynamic(this)
@@ -422,15 +441,25 @@ proc `$`*(this:Dynamic):string =
             $this.ffloat
         of TBool:
             $this.fbool
-        of TAnonObject:
-            $this[]
+        of TAnon:
+            toString(this.fanon)
         of TClass:
             toString(this.fclass)
         else:
             "Dynamic unknown"
     else: "null"
 
-proc toString[T:DynamicHaxeObjectRef](this:T): string =
+proc toString* [T:DynamicHaxeObjectRef](this:T): string =
+    var isFirst = true
+    result = "{"
+    for f in this.fields:
+        if not isFirst: result &= ", "
+        result &= $f.thash & ": " & $f.data.toDynamic
+        isFirst = false
+    result &= "}"
+
+proc toString* [T:DynamicHaxeWrapper](this:T): string =
+    #return toString(cast[typ(this)](this.instance))
     var isFirst = true
     result = "{"
     for f in this.fields:
@@ -454,12 +483,18 @@ template newDynamic*(value:int):Dynamic =
 template newDynamic*(value:float):Dynamic =
     Dynamic(kind:TFloat, ffloat: value)
 
-template newDynamic*(value:AnonObject):Dynamic =
-    Dynamic(kind:TAnonObject, fanon: value)
-
-template newDynamic*[T:DynamicHaxeObjectRef](value:T):Dynamic =
+template newDynamic*(value: DynamicHaxeWrapper):Dynamic =
     checkDynamic(value)
-    Dynamic(kind:TClass, fclass: value)
+    Dynamic(kind:TAnonWrapper, fwrapper: value)
+
+template newDynamic*[T:HaxeObjectRef](value: T):Dynamic =
+    when T is DynamicHaxeObjectRef:
+        checkDynamic(value)
+        Dynamic(kind:TAnon, fanon: value)
+    else:
+        Dynamic(kind:TClass, fclass: value)
+
+# template newDynamic*[T:DynamicHaxeObjectRef](value: T):Dynamic =
 
 proc newDynamic*(value:pointer):Dynamic =
     Dynamic(kind:TPointer, fpointer: value)
@@ -467,65 +502,48 @@ proc newDynamic*(value:pointer):Dynamic =
 template newDynamic*(value:ref Exception):Dynamic =
     Dynamic(kind:TString, fstring: value.msg)
 
-proc `{}`*(this:Dynamic, name:string):Dynamic {.gcsafe.} =    
-    case this.kind
-    of TAnonObject:
-        this.fanon{name}
-    of TClass:
-        this.fclass.getFieldByName(name)
-    else:
-        nil
-
-proc `{}=`*(this:Dynamic, name:string, value: Dynamic) =    
-    case this.kind
-    of TAnonObject:
-        this.fanon{name}=value
-    of TClass:
-        this.fclass.setFieldByName(name, value)
-    else:
-        discard
-
-proc `{}=`*[T](this:Dynamic, name:string, value: T) =    
-    case this.kind
-    of TAnonObject:
-        this.fanon{name}=newDynamic(value)
-    of TClass:
-        this.fclass.setFieldByName(name, newDynamic(value))
-    else:
-        discard
-
 
 proc getFieldNames*(this:Dynamic):HaxeArray[string] =
     case this.kind
-    of TAnonObject:
+    of TAnon:
         this.fanon.getFields()
     of TClass:
-        this.fclass.getFields()
+        #this.fclass.getFields()
+        nil
     else:
         nil
 
-template call*[T](this:Dynamic, tp:typedesc[T], args:varargs[untyped]):untyped =    
-    case this.kind
-    of TPointer:
-        var pr:T = cast[tp](this.fpointer)
-        pr(args)
-    else:
-        raise newException(ValueError, "Dynamic wrong type")
+when false:
+    template call*[T](this:Dynamic, tp:typedesc[T], args:varargs[untyped]):untyped =    
+        case this.kind
+        of TPointer:
+            var pr:T = cast[tp](this.fpointer)
+            pr(args)
+        else:
+            raise newException(ValueError, "Dynamic wrong type")
 
-template call*[T](this:Dynamic, name:string, tp:typedesc[T], args:varargs[untyped]):untyped =    
-    case this.kind:
-    of TAnonObject, TClass:
-        this{name}.call(tp, args)
-    else:
-        raise newException(ValueError, "Dynamic wrong type")
+    template call*[T](this:Dynamic, name:string, tp:typedesc[T], args:varargs[untyped]):untyped =    
+        case this.kind:
+        of TAnon, TClass:
+            this{name}.call(tp, args)
+        else:
+            raise newException(ValueError, "Dynamic wrong type")
 
-converter toDynamic*[T: DynamicHaxeObjectRef](v:T): Dynamic {.inline.} = newDynamic(v)
+converter toDynamic*[T: DynamicHaxeObjectRef](v:T): Dynamic {.inline.} = 
+    newDynamic(v)
+
+converter toDynamic*[T: DynamicHaxeWrapper](v: T): Dynamic {.inline.} = 
+    return newDynamic(v)
 
 template toDynamic*(this:untyped):untyped =
     newDynamic(this)
 
 proc fromDynamic*[T](this:Dynamic, t:typedesc[T]) : T =
-    case this.kind
+    if this == nil:
+        echo "null ! ", t.name
+        return T.default
+    else :  
+      case this.kind
         of TInt:
             when T is int32: this.fint
             elif T is float: this.fint.float
@@ -548,19 +566,27 @@ proc fromDynamic*[T](this:Dynamic, t:typedesc[T]) : T =
             elif T is float: ord(this.fbool).float
             elif T is string: (if this.fbool: "true" else: "false")
             else: T.default
-        of TClass:
+        of TAnon:
             when T is DynamicHaxeObjectRef: 
                 #echo this.fclass == nil
-                cast[T](this.fclass)
+                cast[T](this.fanon)
             elif T is DynamicHaxeObject:
-                if this.fclass != nil: cast[T](this.fclass) else: 
+                if this.fanon != nil: cast[T](this.fanon) else: 
                     echo "null acces"
                     T.default
             else: 
                 echo "warning ", t.name
                 T.default
+        of TAnonWrapper:
+            when T is DynamicHaxeWrapper:
+                cast[T](this.fwrapper)
+            else :
+                echo "warning ", t.name
+                T.default
         else:
-            raise newException(ValueError, "Dynamic wrong type")
+            echo "Dynamic wrong type"
+            # raise newException(ValueError, "Dynamic wrong type")
+            T.default
 
 template declDynaimcBinOp(op) =
     template op*[T:int32|float|int|string|bool](lhs: Dynamic, rhs:T): auto =
@@ -616,51 +642,164 @@ proc rawClosure* [T: proc](prc: pointer, env: pointer): T {.noSideEffect, inline
 
 import macros
 
-macro `{}`*(f: typed, name: static string): auto =
-    let xn = ident(name)
-    let isdyn = ident("kind")
-    let ft = getType(f)
-    var tn = ft[1].strVal
-    let ttn = ident(tn.substr(0, tn.find(":") - 1) & "Wrapper")
-    let x = quote do:
-        if `f`.`isdyn` == THaxe: `f`.`xn` else: cast[`ttn`](`f`).`xn`[] 
-    return x
+macro extractName*(name: untyped): auto =
+    if name.kind in {nnkStrLit, nnkIdent} :
+        let n = name.strVal
+        return quote do : `n`
+    macros.error("not a string literal", name)
 
-macro `{}=`* [T](f: typed, name: static string, value: T) =
-    let xn = ident(name)
-    let isdyn = ident("kind")
-    let ft = getType(f)
-    var tn = ft[1].strVal
-    let ttn = ident(tn.substr(0, tn.find(":") - 1) & "Wrapper")
-    let res = value.sameType(bindSym"int")
-    if res:
-        let xx = quote do:
-            block:
-                let v = `value`
-                if `f`.`isdyn` == THaxe: 
-                    `f`.`xn` = v.int32
-                else: 
-                    cast[`ttn`](`f`).`xn`[] = v.int32
-        return xx
+macro `dot`* (f: untyped, name: untyped): auto =
+    if name.kind in {nnkStrLit, nnkIdent} :
+        let n = ident(name.strVal)
+        return quote do:
+            when compiles(`f`.`n`) :
+                when `f` is DynamicHaxeWrapper:
+                    `f`.`n`[]
+                else:
+                    `f`.`n`
+            else :
+                getFieldByName(`f`, extractName(`name`))
+
+macro `dotSet`* (f: untyped, name: untyped, value: untyped): auto =
+    # echo "dot= ", value.treeRepr
+    if name.kind in {nnkStrLit, nnkIdent} :
+        let n = ident(name.strVal)
+        return quote do:
+            when compiles(`f`.`n`) :
+                block :                    
+                    when `f` is DynamicHaxeWrapper:
+                        let fp = `f`.`n`
+                        if not fp.isNil: fp[] = `value` else: setFieldByName(`f`, extractName(`name`), `value`.toDynamic)
+                    else:
+                        `f`.`n` = `value`
+            else :
+                echo "by set"
+                setFieldByName(`f`, extractName(`name`), `value`.toDynamic)
+
+template `{}`* [T: DynamicHaxeWrapper | DynamicHaxeObjectRef | DynamicHaxeObject](f: T, name: static[string]): auto =
+    bind dot
+    # echo "by dot"
+    dot(f, name)
+
+template `{}=`* [T:DynamicHaxeWrapper | DynamicHaxeObjectRef](f: T, name: static[string], value: typed) =
+    bind dotSet
+    dotSet(f, name, value)
+
+
+proc `{}`*(this:Dynamic, name:string):Dynamic {.gcsafe.} =    
+    echo "by Dynamic ", name
+    case this.kind
+    of TAnonWrapper :
+        this.fwrapper.getFieldByName(name)
+    of TAnon:
+        #this.fanon{name}
+        this.fanon.getFieldByName(name)
+    of TClass:
+        when compiles(this.fclass.getFieldByName(name)):
+            this.fclass.getFieldByName(name)
+        else: nil
     else:
-        let xx = quote do:
+        nil
+
+proc `{}=`*(this:Dynamic, name:string, value: Dynamic) =    
+    case this.kind
+    of TAnon:
+        #this.fanon{name}=value
+        this.fanon.setFieldByName(name, value)
+    of TClass:
+        when compiles(this.fclass.setFieldByName(name, value)):
+            this.fclass.setFieldByName(name, value)
+        else: discard
+    else:
+        discard
+
+proc `{}=`*[T](this:Dynamic, name:string, value: T) =    
+    case this.kind
+    of TAnon:
+        #this.fanon{name}=newDynamic(value)
+        this.fanon.setFieldByName(name, newDynamic(value))
+    of TClass:
+        when compiles(this.fclass.setFieldByName(name, newDynamic(value))):
+            this.fclass.setFieldByName(name, newDynamic(value))
+        else: discard
+    else:
+        discard
+
+
+when false:
+    template `{}`*(f: typed, name: untyped): auto =
+        when compiles(cast[typ(f)](f.instance).`name`):
+            cast[typ(f)](f.instance).`name` 
+        else: 
+            getFieldByName(f, `name`)
+
+when false:
+    macro `{}`*(f: typed, name: static string): auto =
+        let xn = ident(name)
+        let isdyn = ident("kind")
+        let ft = getType(f)
+        echo ft.lispRepr    
+        var tn = ft[1].strVal
+        #let ttn = ident(tn.substr(0, tn.find(":") - 1) & "Wrapper")
+        let x = quote do:
             block:
-                let v = `value`
-                if `f`.`isdyn` == THaxe: 
-                    `f`.`xn` = v
+                let f = `f`
+                # echo f.`isdyn` 
+                when compiles(cast[typ(f)](f.instance).`xn`):
+                    cast[typ(f)](f.instance).`xn`
                 else: 
-                    cast[`ttn`](`f`).`xn`[] = v
-        return xx
+                    getFieldByName(f, `xn`)
+        # echo x.treeRepr
+        return x
 
-template `{}`* (this: untyped, name: string): Dynamic =
-    this.getFieldByName(name)
+when false:
+    template `{}=`*(f: typed, name: untyped, value: typed) =
+        when compiles(cast[typ(f)](f.instance).`name`):
+            cast[typ(f)](f.instance).`name` = value
+        else: 
+            setFieldByName(f, `name`, value)
+        
 
-proc getFieldByName* (this: DynamicHaxeObjectRef, name:string): Dynamic {.gcsafe.} =
+when false:
+    macro `{}=`* [T](f: typed, name: static string, value: T) =
+        let xn = ident(name)
+        let isdyn = ident("kind")
+        let ft = getType(f)
+        echo ft.lispRepr, name    
+        #var tn = ft[1].strVal
+        #let ttn = ident(tn.substr(0, tn.find(":") - 1) & "Wrapper")
+        echo getType(value)
+        let res = value.sameType(bindSym"int")
+        if res:
+            let xx = quote do:
+                block:
+                    let v = `value`.int32
+                    let f = `f`
+                    when compiles(cast[typ(f)](f.instance).`xn`):
+                        cast[typ(f)](f.instance).`xn` = v
+                    else: 
+                        setFieldByName(f, `name`, newDynamic(v))
+            return xx
+        else:
+            let xx = quote do:
+                block:
+                    let v = `value`
+                    let f = `f`
+                    when compiles(cast[typ(f)](f.instance).`xn`):
+                        cast[typ(f)](f.instance).`xn` = v
+                    else: 
+                        setFieldByName(f, `name`, newDynamic(v))
+            return xx
+when false:
+    template `{}`* (this: untyped, name: string): Dynamic =
+        this.getFieldByName(name)
+
+proc getFieldByName* (this: DynamicHaxeObjectRef | DynamicHaxeWrapper, name:string): Dynamic {.gcsafe.} =
     let f = this.fields.get(name)
     if f != nil :
         return f[].toDynamic
     
-proc setFieldByName* (this: DynamicHaxeObjectRef, name:string, value:Dynamic):void = 
+proc setFieldByName* (this: DynamicHaxeObjectRef | DynamicHaxeWrapper, name:string, value:Dynamic):void = 
     let f = this.fields.setOrInsert(name, AnonNextGen(fanonType: atDynamic, fdynamic: value))
     if f != nil :
         case f[].fanonType :
@@ -670,10 +809,11 @@ proc setFieldByName* (this: DynamicHaxeObjectRef, name:string, value:Dynamic):vo
         of atStaticString: cast[ptr string](f[].fstatic)[] = fromDynamic(value, string)
         of atStaticArray: discard # TODO 
         of atStaticAnon: cast[ptr DynamicHaxeObjectRef](f[].fstatic)[] = fromDynamic(value, DynamicHaxeObjectRef)
+        of atStaticAnonWrapper: cast[ptr DynamicHaxeWrapper](f[].fstatic)[] = fromDynamic(value, DynamicHaxeWrapper)
         of atStaticInstance: discard # TODO
         of atDynamic: f[].fdynamic = value
 
-proc adr* [T](this: DynamicHaxeObjectRef, name:string): ptr T = 
+proc adr* [T](this: DynamicHaxeObjectRef | DynamicHaxeWrapper, name:string): ptr T = 
     let f = this.fields.get(name)
     if f != nil :
         case f[].fanonType:
@@ -698,10 +838,14 @@ proc adr* [T](this: DynamicHaxeObjectRef, name:string): ptr T =
             when T is string: return cast[ptr T](f[].fstatic)
         of atStaticAnon:
             when T is DynamicHaxeObjectRef: return cast[ptr T](f[].fstatic)
+        of atStaticAnonWrapper:
+            when T is DynamicHaxeWrapper: return cast[ptr T](f[].fstatic)
         of atStaticArray:
             when T is HaxeArray: return cast[ptr T](f[].fstatic)
         of atStaticInstance:
             when T is HaxeObjectRef: return cast[ptr T](f[].fstatic)
+    echo "anon has no field " & name & " of type " & T.name
+    #return nil
     raise newException(NullAccess, "anon has no field " & name & " of type " & T.name)
 
 proc fromField* [T](field: var T): AnonNextGen =
@@ -711,5 +855,7 @@ proc fromField* [T](field: var T): AnonNextGen =
     elif T is string: AnonNextGen(fanonType: atStaticString, fstatic: addr field)
     elif T is HaxeArray: AnonNextGen(fanonType: atStaticArray, fstatic: addr field)
     elif T is DynamicHaxeObjectRef: AnonNextGen(fanonType: atStaticAnon, fstatic: addr field)
+    elif T is DynamicHaxeWrapper: AnonNextGen(fanonType: atStaticAnonWrapper, fstatic: addr field)
     elif T is Dynamic: AnonNextGen(fanonType: atDynamic, fdynamic: field)
     elif T is HaxeObjectRef: AnonNextGen(fanonType: atStaticInstance, fstatic: addr field)
+

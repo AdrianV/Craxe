@@ -105,6 +105,7 @@ class SomeGeneric<T> {
 
 typedef SomeAnon = {a: Int, b: String};
 
+
 class FooBar extends test.a.Foo {
     override public function bar() {
         super.bar();
@@ -161,6 +162,7 @@ class Main {
     }
 
     static function getAnAnon(v: {a: Int, b: String}) {
+        trace('getAnAnon ---------------------------');
         trace('a = ${v.a} b = ${v.b}');    
         var factor: Int = 2;
         var x = v.a * factor;
@@ -207,6 +209,12 @@ class Main {
             iteration++;
         }
         trace(val.i);
+        function fooBar(v: {i: Float, j: Float}) {
+            var foo: {i: Float, j: Float} = v;
+            trace(foo);
+        }
+        fooBar({i: 2.0, j: 3.1});
+        //fooBar(val);
     }
 
     static function testNullT() {
@@ -218,16 +226,19 @@ class Main {
 
     #if (true)
     static function testMap() {
-        var m = new Map();
+        var m = new haxe.ds.StringMap(); // new Map();
         m.set('foo', 'bar');
         m.set('bar', 'foo');
         trace(m.get('foo'));
         var m2 = m.copy();
-        $type(m2);
+        //$type(m2);
         m.clear();
         trace(m.exists('foo'));
         trace(m2.exists('bar'));
         trace(m2);
+        for (v in m2) trace(v);
+        for (k in m2.keys()) trace(k);
+        //for (k => v in m2) trace('$k => $v');
     }
     #end
 
