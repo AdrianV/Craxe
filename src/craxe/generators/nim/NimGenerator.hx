@@ -1,5 +1,6 @@
 package craxe.generators.nim;
 
+import haxe.Unserializer.TypeResolver;
 import haxe.ds.StringMap;
 import craxe.common.ast.ArgumentInfo;
 import craxe.common.ast.PreprocessedTypes;
@@ -14,6 +15,7 @@ import craxe.common.IndentStringBuilder;
 import craxe.common.generator.BaseGenerator;
 import craxe.generators.nim.type.*;
 import craxe.generators.nim.*;
+import craxe.generators.nim.type.TypeResolver;
 
 using craxe.common.ast.MetaHelper;
 
@@ -317,9 +319,12 @@ class NimGenerator extends BaseGenerator {
 		sb.addNewLine(Inc);
 
 		for (td in typedefs) {
+			trace(td.typedefInfo.type);
 			switch (td.typedefInfo.type) {
-				case TInst(t, _):
-					sb.add('${td.typedefInfo.name} = ${t.get().name}');
+				case TInst(t, params):
+					final sparm = TypeResolver.resolveParameters(params);
+					final sto = TypeResolver.resolveClassType(t.get(), params);
+					sb.add('${td.typedefInfo.name}${sparm} = ${sto}'); //{t.get().name}
 					sb.addNewLine(Same);
 				case TFun(_, _):
 					var tpname = TypeResolver.resolve(td.typedefInfo.type);
@@ -750,7 +755,8 @@ class NimGenerator extends BaseGenerator {
 				var clsName = (isStatic ? 'typedesc[' : '') + getClassName(cls) + (!isStatic ? '' : 'Static]');
 				final mi = ClassInfo.methodInfo.get('${method.pos}');
 				final smethod = mi != null ? 'method' : 'proc';
-				sb.add('${smethod} ${method.name}(this:${clsName}');
+				final sparm = TypeResolver.resolveParameters(cls.params);
+				sb.add('${smethod} ${method.name} ${sparm}(this:${clsName}');
 				var anons = null;
 				if (tfunc.args.length > 0) {
 					sb.add(", ");

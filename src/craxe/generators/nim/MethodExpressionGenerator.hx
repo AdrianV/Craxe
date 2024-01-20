@@ -721,6 +721,8 @@ class MethodExpressionGenerator {
 					generateTIf(sb, econd, eif, eelse);
 				case TCall(e, el):
 					generateCommonTCall(sb, e, el);
+				case TUnop(op, postFix, e):
+					generateTUnop(sb, op, postFix, e);
 				case v:
 					throw 'Unsupported ${v}';
 			}
@@ -1045,8 +1047,11 @@ class MethodExpressionGenerator {
 						sb.add("/=");
 					case OpSub:
 						sb.add("-=");
+					case OpMult:
+						sb.add("*=");
 					case v:
-						throw 'Unsupported ${v}';
+						//trace(e1.pos);
+						throw 'Unsupported ${v} at ${e1.pos}';
 				}
 			case OpInterval:
 			case OpArrow:
@@ -1133,6 +1138,10 @@ class MethodExpressionGenerator {
 				sb.add(t.get().name);
 				sb.add(TypeResolver.resolveParameters(params));
 				sb.add("= block: "); // hacky
+			case TAbstract(t, params):
+				if (params.length > 0) {
+					throw 'Unsupported ${t}';
+				}
 			case v:
 				throw 'Unsupported ${v}';
 		}
@@ -1615,6 +1624,9 @@ class MethodExpressionGenerator {
 			case TContinue:
 				sb.add("continue");
 				sb.addNewLine();
+			case TBreak:
+				sb.add("break");
+				sb.addNewLine();
 			case v:
 				throw 'Unsupported ${v}';
 		}
@@ -1754,7 +1766,7 @@ class MethodExpressionGenerator {
 				case _: false;
 			}
 		}
-		switch (expr.expr) {
+		if (expr != null) switch (expr.expr) {
 			case TConst(c):
 			// TODO: handle THIS
 				generateTConst(sb, c, expr.t);
@@ -1813,6 +1825,8 @@ class MethodExpressionGenerator {
 				generateTObjectDecl(sb, fields);		
 			case v:
 				throw 'Unsupported ${v}';
+		} else {
+			trace('null expr');
 		}
 		if (newLine) sb.addNewLine(Same);
 	}

@@ -44,12 +44,15 @@ class CommonAstPreprocessor {
 	/**
 	 * Excluded modules
 	 */
-	static final excludedModules:Array<String> = ["haxe.", "StdTypes"];
+	static final excludedModules:Array<String> = ["haxe.CallStack", "haxe.Constraints", "haxe.Int32", "haxe.Int64", "haxe.Log", 
+		"haxe.MainLoop", "MainLoop", "haxe.EntryPoint", "EntryPoint",
+		"haxe.NativeStackTrace", "haxe.StackItem", "haxe.SysTools", "Any", "Array", "StdTypes", "haxe.ds.Map", "haxe.exceptions."];
 
 	/**
 	 * Filter not needed type. Return true if filtered
 	 */
 	function filterTypeByName(name:String, module:String):Bool {
+		//trace('$name from $module');
 		for (excl in excludedModules) {
 			if (module.indexOf(excl) >= 0)
 				return true;
@@ -57,7 +60,7 @@ class CommonAstPreprocessor {
 
 		if (excludedTypes.exists(name))
 			return true;
-
+		//trace('     accepted  ----------------------');
 		return false;
 	}
 
@@ -340,7 +343,8 @@ class CommonAstPreprocessor {
 					var td = buildTypedef(t.get(), params);
 					if (td != null)
 						typedefs.push(td);
-				case _:
+				case var v:
+					trace('$v');
 			}
 		}
 

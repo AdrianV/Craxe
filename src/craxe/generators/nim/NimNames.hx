@@ -8,6 +8,10 @@ class NimNames {
 		"const" => "vConst",
 		"let" => "vLet",
 		"yield" => "vYield", 
+		"iterator" => "vIterator",
+		"converter" => "vConverter",
+		"method" => "vMethod",
+		"proc" => "vProc",
 	];
 
 	static public inline function fixReserved(name: String) {

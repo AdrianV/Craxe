@@ -6,4 +6,5 @@
 #--class-path test
 --main test.Main
 -D analyzer-optimize
+--dce full
 

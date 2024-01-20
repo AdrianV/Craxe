@@ -94,7 +94,7 @@ type
     HaxeStringMap*[T] = HaxeMap[string, T]
 
     # Haxe Int map
-    HaxeIntMap*[T] = HaxeMap[int, T]
+    HaxeIntMap*[T] = HaxeMap[int32, T]
 
     # Haxe object map
     HaxeObjectMap*[K, V] = HaxeMap[K, V]
@@ -160,16 +160,6 @@ proc bmmOperator*[T](val:var T):T {.discardable, inline.} =
     dec(val)
     result = val
 
-when false:
-    template `+`*(s:string, i:untyped): string =
-        s & $i
-
-    template `+`*(i:untyped, s:string): string =
-        $i & s
-
-    template `+`*(s1:string, s2:string): string =
-        s1 & s2
-
 proc toString*[T](this: T):string =
     this.repr
 
@@ -189,6 +179,12 @@ converter fromValue* [T: ValueType](v:T): Null[T] {.inline.} =
 
 converter fromValue* (v:int): Null[int32] {.inline.} =
     Null[int32](value: v.int32) 
+
+template indexOf* (s: string, sub: string): int32 =
+    int32(s.find(sub))
+
+template indexOf* (s: string, sub: string, start: int32): int32 =
+    int32(s.find(sub), start)
 
 when false:
     template toNull* [T](v:typeof(nil)): Null[T] =
@@ -346,7 +342,7 @@ proc newStringMap*[T]() : HaxeStringMap[T] =
 
 proc newIntMap*[T]() : HaxeIntMap[T] =
     result = HaxeIntMap[T]()
-    result.data = initTable[int, T](TABLE_INIT_SIZE)
+    result.data = initTable[int32, T](TABLE_INIT_SIZE)
 
 proc newObjectMap*[K, V]() : HaxeObjectMap[K, V] =
     result = HaxeObjectMap[K, V]()

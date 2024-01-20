@@ -5,6 +5,9 @@ import nimiter
 
 template newHaxeStringMap*[T](): HaxeStringMap[T] = newStringMap[T]()
 template newStringMapXhaxeds*[T](): HaxeStringMap[T] = newStringMap[T]()
+template newHaxeIntMap*[T](): HaxeIntMap[T] = newIntMap[T]()
+template newIntMapXhaxeds*[T](): HaxeIntMap[T] = newIntMap[T]()
+
 template newDynamic*[K,V](value: HaxeMap[K,V]) = 
     #checkDynamic[HaxeMap[K,V]](value)
     Dynamic(kind:TClass, fclass: value)

@@ -226,7 +226,7 @@ class Main {
 
     #if (true)
     static function testMap() {
-        var m = new haxe.ds.StringMap(); // new Map();
+        var m = new Map();
         m.set('foo', 'bar');
         m.set('bar', 'foo');
         trace(m.get('foo'));
@@ -239,6 +239,19 @@ class Main {
         for (v in m2) trace(v);
         for (k in m2.keys()) trace(k);
         for (k => v in m2) trace('$k => $v');
+        var m = new Map();
+        m.set(1, "one");
+        m.set(2, "two");
+        m.set(3, "three");
+        for (k => v in m) trace('$k => $v');
+    }
+    #end
+
+    #if (false)
+    static function testList() {
+        var l = new List();
+        for (i in 1...10) l.add({x: i});
+        for (x in l) trace(x);
     }
     #end
 
@@ -286,5 +299,6 @@ class Main {
         testGeneric();
         testSys();
         testMap();
+        //testList();
     }
 }
