@@ -14,6 +14,7 @@ import haxe.macro.Type.FieldAccess;
 import haxe.macro.Type.ClassType;
 import haxe.macro.Type.TypedExpr;
 import haxe.macro.Type.TypedExprDef;
+import haxe.macro.TypeTools;
 import craxe.common.IndentStringBuilder;
 import craxe.generators.nim.type.*;
 import craxe.common.ContextMacro;
@@ -114,6 +115,7 @@ class MethodExpressionGenerator {
 	 * Method return type
 	 */
 	var returnType:Type;
+	var needVoid: Bool = true;
 
 	public static final scopes = new VarInScope();
 	var reqHash = new Map<String, Bool>();
@@ -128,6 +130,16 @@ class MethodExpressionGenerator {
 		if (req != null) {
 			reqHash.set(req, true);
 		}
+	}
+
+	inline function pushVoid(v: Bool): Bool {
+		final res = needVoid;
+		needVoid = v;
+		return res;
+	}
+
+	inline function popVoid(v: Bool) {
+		needVoid = v;
 	}
 
 	/**
@@ -187,9 +199,9 @@ class MethodExpressionGenerator {
 	 */
 	function generateCustomEnumParameterCall(sb:IndentStringBuilder, e1:TypedExpr, ef:EnumField, index:Int):Bool {
 		switch (e1.expr) {
-			case TLocal(v):
+			case TLocal(v) | TCast({t:_,pos:_,expr:TLocal(v)},_):
 				switch (v.t) {
-					case TEnum(t, _):
+					case TEnum(t, _) | TAbstract(_.get().type => TEnum(t, _), _):
 						final ent = t.get();
 						final enumName = ent.name;
 						final instName = ent.names[ef.index];
@@ -206,6 +218,10 @@ class MethodExpressionGenerator {
 						return true;
 					default:
 				}
+//			case TCast(e, m):
+//				switch e.expr {
+//					case TLocal(v):
+//				}
 			default:
 		}
 		return false;
@@ -317,6 +333,7 @@ class MethodExpressionGenerator {
 		if (classType.isExtern) {
 			var isTop = classField.meta.has(":topFunction");
 			className = classType.meta.getMetaValue(":native");
+			checkRequired(classType.meta);
 			// Check it's top function
 			if (className == null) {
 				// TODO: make it better. Maybe getSystemFieldTotalName(classType, classField) ?
@@ -466,7 +483,7 @@ class MethodExpressionGenerator {
 
 		if (expr != null) {
 			sb.add(" = ");
-
+			final ovd = pushVoid(false);
 			var isConvertFromDynamic = false;
 			// Convert from Dynamic to real type
 			switch expr.t {
@@ -486,6 +503,7 @@ class MethodExpressionGenerator {
 			if (isConvertFromDynamic) {
 				sb.add(', ${vartype})');
 			}
+			popVoid(ovd);
 		}
 		sb.addNewLine(Same);
 	}
@@ -574,8 +592,10 @@ class MethodExpressionGenerator {
 									generateTField(sb, e, fa);
 								case TLocal(v):
 									generateTLocal(sb, v);
+								case TConst(c):
+									generateTConst(sb, c, e.t);
 								case v:
-									throw 'Unsupported ${v}';
+									throw 'Unsupported ${v} at ${e.pos}';
 							}
 							return true;
 						}
@@ -707,7 +727,8 @@ class MethodExpressionGenerator {
 
 		sb.add('${object.name}(kind: TAnon');
 		for (field in fields) {
-			sb.add(', ${field.name}: ');
+			final fname = NimNames.fixFieldVarName(field.name);
+			sb.add(', ${fname}: ');
 			switch field.expr.expr {
 				case TConst(c):
 					generateTConst(sb, c, field.expr.t);
@@ -854,8 +875,12 @@ class MethodExpressionGenerator {
 	 */
 	function generateTReturn(sb:IndentStringBuilder, expression:TypedExpr) {
 		var isDynamicReturn = false;
+		var isVoidReturn = false;
+		var needBrackets = false;
 		if (returnType != null) {
 			switch returnType {
+				case TAbstract(t, _), TFun(_, TAbstract(t,_)) if (t.get().name == "Void"): 
+					isVoidReturn = true;
 				case TDynamic(_):
 					switch expression.t {
 						case TDynamic(_):
@@ -872,11 +897,12 @@ class MethodExpressionGenerator {
 				sb.add("return toDynamic(");
 			} else {
 				sb.add("return ");
+				if (needBrackets) sb.add("(");
 			}
 		}
 
 		function addClose() {
-			if (isDynamicReturn) {
+			if (isDynamicReturn || needBrackets) {
 				sb.add(")");
 			}
 		}
@@ -884,6 +910,7 @@ class MethodExpressionGenerator {
 		if (expression == null || expression.expr == null) {
 			sb.add("return");
 		} else {
+			final ovd = pushVoid(isVoidReturn);
 			switch (expression.expr) {
 				case TBlock(e):
 					generateTBlock(sb, e);
@@ -906,6 +933,7 @@ class MethodExpressionGenerator {
 					generateTFunction(sb, tfunc);
 					addClose();
 				case TBinop(op, e1, e2):
+					needBrackets = true;
 					addReturn();
 					generateTBinop(sb, op, e1, e2);
 					addClose();
@@ -944,15 +972,19 @@ class MethodExpressionGenerator {
 				case v:
 					throw 'Unsupported ${v}';
 			}
+			popVoid(ovd);
 		}
 	}
 
+	var binOpLevel = 0;
 	/**
 	 * Generate code for TBinop
 	 */
 	function generateTBinop(sb:IndentStringBuilder, op:Binop, e1:TypedExpr, e2:TypedExpr) {
-		final needBrackets = switch op {
-			case OpBoolOr | OpShr | OpShl | OpOr: true;
+		binOpLevel++;
+		final ovd = pushVoid(false);
+		final needBrackets = (switch op {
+			case OpBoolOr | OpShr | OpShl | OpUShr | OpOr | OpAnd  : true;
 			case OpAssign:
 				switch e1.expr {
 					case TLocal(v) if (scopes.isParamVar(v)):
@@ -961,13 +993,13 @@ class MethodExpressionGenerator {
 					case _:
 				}
 				false;
-			case _: false;
-		}
-
+			case _: 
+				false;
+		} ) || (binOpLevel > 1);
 		if (needBrackets) sb.add("(");
 		final typMix: TypeMix  = switch op {
 			case OpUShr: FirstUInt; 
-			case OpAdd:
+			case OpAdd | OpAssign | OpAssignOp(_):
 				if (e1.t.isString()) {
 					if (e2.t.isString()) StringString
 					else FirstString;
@@ -977,21 +1009,21 @@ class MethodExpressionGenerator {
 				else if (e1.t.isInt() && e2.t.isFloat()) IntFloat
 				else None;
 			case OpMult | OpDiv | OpSub | OpEq | OpNotEq | OpGt |
-				OpGte | OpLt | OpLte | OpMod | OpAssign:
+				OpGte | OpLt | OpLte | OpMod :
 				if (e1.t.isFloat() && e2.t.isInt()) FloatInt
 				else if (e1.t.isInt() && e2.t.isFloat()) IntFloat
 				else None;		
 			case _: None;
 		}
-		switch typMix {
+		if ( !op.match(OpAssign) && !op.match(OpAssignOp(_)) ) switch typMix {
 			case IntFloat: sb.add("toFloat(");
 			case SecondString: sb.add("$(");
 			case _:
 		}
 		generateTBlockSingleExpression(sb, e1, false);
 		switch typMix {
-			case IntFloat | SecondString: sb.add(")");
-			case FirstUInt: sb.add(".uint");
+			case IntFloat | SecondString: if ( !op.match(OpAssign) && !op.match(OpAssignOp(_))) sb.add(")");
+			case FirstUInt: sb.add(".uint32");
 			case _:
 		}
 		sb.add(" ");
@@ -1042,13 +1074,20 @@ class MethodExpressionGenerator {
 			case OpAssignOp(op):
 				switch op {
 					case OpAdd:
-						sb.add("+=");
+						switch typMix {
+							case FirstString | SecondString | StringString:
+								sb.add("&=");
+							case _:
+								sb.add("+=");
+							}
 					case OpDiv:
 						sb.add("/=");
 					case OpSub:
 						sb.add("-=");
 					case OpMult:
 						sb.add("*=");
+					case OpOr:
+						sb.add("|=");
 					case v:
 						//trace(e1.pos);
 						throw 'Unsupported ${v} at ${e1.pos}';
@@ -1062,6 +1101,7 @@ class MethodExpressionGenerator {
 		switch typMix {
 			case FloatInt: sb.add("toFloat(");
 			case FirstString: sb.add("$(");
+			//case IntFloat if (op.match(OpAssign) || op.match(OpAssignOp(_))): 
 			case _:
 		}
 		switch e2.expr {
@@ -1073,9 +1113,17 @@ class MethodExpressionGenerator {
 		}
 		switch typMix {
 			case FloatInt | FirstString: sb.add(")");
+			case IntFloat:
+				switch op {
+					case OpAdd | OpAssign | OpAssignOp(_):
+					case _:
+				}
 			case _:
 		}
 		if (needBrackets) sb.add(")");
+		if (typMix.match(FirstUInt)) sb.add(".int32");
+		popVoid(ovd);
+		binOpLevel--;
 	}
 
 	/**
@@ -1359,7 +1407,7 @@ class MethodExpressionGenerator {
 	 * Generate code for common TCall
 	 */
 	// TODO: refactor that
-	function generateCommonTCall(sb:IndentStringBuilder, expression:TypedExpr, expressions:Array<TypedExpr>, wantVoid: Bool = false) {
+	function generateCommonTCall(sb:IndentStringBuilder, expression:TypedExpr, expressions:Array<TypedExpr>) {
 		// Check raw code paste
 		if (generateRawCodeCall(sb, expression, expressions))
 			return;
@@ -1367,13 +1415,17 @@ class MethodExpressionGenerator {
 		var isTraceCall = false;
 		var isAsync = false;
 		var needExtraBracket = false;
-		final needDiscard = wantVoid && switch expression.t {
+		final needDiscard = needVoid && ! isVoid(expression.t);
+		#if (false)
+		{
 			case TInst(_, _): true;
 			case TAbstract(t, _): t.get().name != "Void";
 			case TFun(_, TAbstract(t, _)): t.get().name != "Void";
 			case _: false;
 		}
-		if (needDiscard) sb.add("discard ");
+		#end
+		if (needDiscard) 
+			sb.add("discard ");
 		switch (expression.expr) {
 			case TField(_, FEnum(c, ef)):
 				var name = c.get().name;
@@ -1423,6 +1475,7 @@ class MethodExpressionGenerator {
 		}
 
 		var wasConverter = false;
+		final ovd = pushVoid(false);
 		for (i in 0...expressions.length) {
 			var expr = expressions[i];
 			var farg = if (funArgs != null) {
@@ -1516,7 +1569,7 @@ class MethodExpressionGenerator {
 			if (i + 1 < expressions.length)
 				sb.add(", ");
 		}
-
+		popVoid(ovd);
 		if (!isAsync)
 			sb.add(")");
 		if (needExtraBracket)
@@ -1530,7 +1583,7 @@ class MethodExpressionGenerator {
 	 */
 	function generateBlockTCall(sb:IndentStringBuilder, expression:TypedExpr, expressions:Array<TypedExpr>, checkReturn = true) {
 		// Detect if need discard type
-		switch (expression.expr) {
+		if (checkReturn) switch (expression.expr) {
 			case TField(_, fa):
 				var cfield:ClassField = null;
 				switch (fa) {
@@ -1540,12 +1593,14 @@ class MethodExpressionGenerator {
 						cfield = cf.get();
 					case FAnon(cf):
 						cfield = cf.get();
+					case FDynamic(s):
+						trace(s);
 					case _:
 				}
 				if (cfield == null) 
-					trace(fa);
+					trace('$fa at ${expression.pos}');
 				var hasReturn = false;
-				switch (cfield.type) {
+				if (cfield != null) switch (cfield.type) {
 					case TFun(_, ret):
 						switch (ret) {
 							case TInst(t, _):
@@ -1570,9 +1625,9 @@ class MethodExpressionGenerator {
 	/**
 	 * Generate code for TIf
 	 */
-	function generateTIf(sb:IndentStringBuilder, econd:TypedExpr, eif:TypedExpr, eelse:TypedExpr, wantVoid: Bool = false) {
+	function generateTIf(sb:IndentStringBuilder, econd:TypedExpr, eif:TypedExpr, eelse:TypedExpr) {
 		sb.add("if ");
-
+		final ovd = pushVoid(false);
 		switch (econd.expr) {
 			case TParenthesis(e):
 				switch e.expr {
@@ -1592,7 +1647,7 @@ class MethodExpressionGenerator {
 			case v:
 				throw 'Unsupported ${v}';
 		}
-
+		popVoid(ovd);
 		sb.add(":");
 		sb.addNewLine(Inc);
 
@@ -1606,7 +1661,7 @@ class MethodExpressionGenerator {
 			case TBinop(op, e1, e2):
 				generateTBinop(sb, op, e1, e2);
 			case TCall(e, el):
-				generateCommonTCall(sb, e, el, wantVoid);
+				generateCommonTCall(sb, e, el);
 			case TMeta(m, e1):
 				generateTMeta(sb, m, e1);
 			case TBlock(el):
@@ -1623,10 +1678,10 @@ class MethodExpressionGenerator {
 				generateTThrow(sb, e);
 			case TContinue:
 				sb.add("continue");
-				sb.addNewLine();
+				sb.addNewLine(Same);
 			case TBreak:
 				sb.add("break");
-				sb.addNewLine();
+				sb.addNewLine(Same);
 			case v:
 				throw 'Unsupported ${v}';
 		}
@@ -1640,7 +1695,7 @@ class MethodExpressionGenerator {
 				case TConst(c):
 					generateTConst(sb, c, eelse.t);
 				case TBlock(el):
-					generateTBlock(sb, el, true);
+					generateTBlock(sb, el, needVoid);
 					#if (false)
 					if (el.length > 0) {
 						switch (eelse.expr) {
@@ -1664,6 +1719,9 @@ class MethodExpressionGenerator {
 				case TBreak:
 					sb.add("break");
 					sb.addNewLine(Same);
+				case TContinue:
+					sb.add("continue");
+					sb.addNewLine(Same);
 				case TIf(econd, eif, eelse):
 					generateTIf(sb, econd, eif, eelse);
 				case TReturn(e):
@@ -1680,7 +1738,9 @@ class MethodExpressionGenerator {
 	 */
 	function generateTWhile(sb:IndentStringBuilder, econd:TypedExpr, whileExpression:TypedExpr, isNormal:Bool) {
 		sb.add("while ");
+		final ovd = pushVoid(false);
 		generateTBlockSingleExpression(sb, econd, false);
+		popVoid(ovd);
 		sb.add(":");
 		sb.addNewLine(Inc);
 
@@ -1756,16 +1816,33 @@ class MethodExpressionGenerator {
 		}	
 	}
 
+	function isVoid(t:Type): Bool {
+		//trace(TypeTools.follow(t));
+		return switch TypeTools.follow(t) {
+			case TAbstract(t, _), TFun(_, TAbstract(t,_)) :
+				final tt = t.get();
+				if (tt.module == "StdTypes") 
+					switch (tt.name) {
+						case "Void": true;
+						case "Null": 
+							isVoid(tt.params[0].t);
+							//final nt: Type = tt.params[0].t
+						case _: false;
+					}
+				else false;
+			case TType(t, _):
+				isVoid(t.get().type);
+			case TFun(_, ret):
+				isVoid(ret);
+			case _: 
+				false;
+		}
+	}
+
 	/**
 	 * Generate single expression from TBlock
 	 */
 	public function generateTBlockSingleExpression(sb:IndentStringBuilder, expr:TypedExpr, newLine = true) {
-		inline function isVoid(): Bool {
-			return switch expr.t {
-				case TAbstract(t, _) if (t.get().name == "Void"): true;
-				case _: false;
-			}
-		}
 		if (expr != null) switch (expr.expr) {
 			case TConst(c):
 			// TODO: handle THIS
@@ -1773,19 +1850,29 @@ class MethodExpressionGenerator {
 			case TVar(v, expr):
 				generateTVar(sb, v, expr);
 			case TCall(e, el):
+				#if (false)
+				final hasDiscard = needVoid && ! isVoid(e.t);
+				if (hasDiscard) {
+					sb.add("discard ");
+					trace('${e.pos} ${e.t}');
+				}
+				final ovd = pushVoid(false);
+				#end
 				if (! newLine) 
 					generateCommonTCall(sb, e, el);
 				else
-					generateBlockTCall(sb, e, el, newLine);
+					generateBlockTCall(sb, e, el, false);
+				//popVoid(ovd);
 			case TReturn(e):
 				generateTReturn(sb, e);
 			case TBinop(op, e1, e2):
 				generateTBinop(sb, op, e1, e2);
 			case TBlock(el):
-				if (newLine) generateTBlock(sb, el, true);
+				if (newLine) 
+					generateTBlock(sb, el, true);
 				else generateTBlockInline(sb, el);
 			case TIf(econd, eif, eelse):
-				generateTIf(sb, econd, eif, eelse, isVoid());
+				generateTIf(sb, econd, eif, eelse);
 			case TWhile(econd, e, normalWhile):
 				generateTWhile(sb, econd, e, normalWhile);
 			case TMeta(m, e1):
@@ -1842,12 +1929,30 @@ class MethodExpressionGenerator {
 				sb.addNewLine(Inc);	
 			}
 			for (x => expr in expressions) {
-				if (expr.expr.match(TLocal(_))) { // hacky way to filter out unnecessary local variable which should be discarded
-					//trace('$isBody $x from ${expressions.length}');
-					//trace('$expr');
-					if (x < expressions.length - 1) continue;
+				final isLast = x == expressions.length - 1;
+				switch (expr.expr) {
+					case TLocal(_): // hacky way to filter out unnecessary local variable which should be discarded
+						//trace('$isBody $x from ${expressions.length}');
+						//trace('$expr');
+						if (needVoid || ! isLast) 
+							continue;
+					case TConst(v):
+						if (needVoid || ! isLast) 
+							continue;
+						if (isBody) {
+							if (x < expressions.length - 1) continue;
+							#if (false)
+							switch (returnType.t.get()) {
+								case TAbstract(a):
+							}
+							continue;
+							#end
+						}
+					case _:
 				}
-				generateTBlockSingleExpression(sb, expr);
+				final ovd = pushVoid(needVoid || ! isLast);
+				generateTBlockSingleExpression(sb, expr, true);
+				popVoid(ovd);
 			}
 			if ( ! isBody) {
 				sb.addNewLine(Dec);
@@ -1858,6 +1963,7 @@ class MethodExpressionGenerator {
 		}
 	}
 
+	#if (false)
 	/**
 	 * Generate root block of method
 	 */
@@ -1884,6 +1990,7 @@ class MethodExpressionGenerator {
 			sb.add("discard");
 		}
 	}
+	#end
 
 	/**
 	 * Generate TBlock like:
@@ -1971,6 +2078,7 @@ class MethodExpressionGenerator {
 	public function generateMethodBody(sb:IndentStringBuilder, classContext:ClassInfo, methodExpression:TypedExpr, returnType:Type = null) {
 		this.classContext = classContext;
 		this.returnType = returnType;
+		final ovd = pushVoid(returnType == null || isVoid(returnType));
 		switch (methodExpression.expr) {
 			case TFunction(tfunc):
 				//var largs = [for (a in func.args) {name: scopes.createVar(a.v), t: a.v.t}];
@@ -1989,5 +2097,6 @@ class MethodExpressionGenerator {
 			case v:
 				throw 'Unsupported paramter ${v}';
 		}
+		popVoid(ovd);
 	}
 }

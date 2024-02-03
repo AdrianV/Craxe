@@ -27,9 +27,7 @@
 **/
 @:pure
 @:require("nimmath")
-#if (nim && !macro)
 @:native("nimmath")
-#end
 extern class Math {
 	/**
 		Represents the ratio of the circumference of a circle to its diameter,
@@ -212,6 +210,7 @@ extern class Math {
 		If `v` is outside of the signed `Int32` range, or is `NaN`, `NEGATIVE_INFINITY`
 		or `POSITIVE_INFINITY`, the result is unspecified.
 	**/
+	@:native("floori")
 	static function floor(v:Float):Int;
 
 	/**
@@ -228,13 +227,13 @@ extern class Math {
 	**/
 	static function random():Float;
 
-	#if (flash || cpp || eval)
 	/**
 		Returns the largest integer value that is not greater than `v`, as a `Float`.
 
 		If `v` is is `NaN`, `NEGATIVE_INFINITY` or `POSITIVE_INFINITY`,
 		the result is unspecified.
 	**/
+	@:native("floor")
 	static function ffloor(v:Float):Float;
 
 	/**
@@ -243,6 +242,7 @@ extern class Math {
 		If `v` is is `NaN`, `NEGATIVE_INFINITY` or `POSITIVE_INFINITY`,
 		the result is unspecified.
 	**/
+	@:native("ceil")
 	static function fceil(v:Float):Float;
 
 	/**
@@ -253,20 +253,8 @@ extern class Math {
 		If `v` is is `NaN`, `NEGATIVE_INFINITY` or `POSITIVE_INFINITY`,
 		the result is unspecified.
 	**/
+	@:native("round")
 	static function fround(v:Float):Float;
-	#else
-	static inline function ffloor(v:Float):Float {
-		return floor(v);
-	}
-
-	static inline function fceil(v:Float):Float {
-		return ceil(v);
-	}
-
-	static inline function fround(v:Float):Float {
-		return round(v);
-	}
-	#end
 
 	/**
 		Tells if `f` is a finite number.

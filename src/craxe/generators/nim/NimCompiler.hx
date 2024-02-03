@@ -40,6 +40,10 @@ class NimCompiler extends BaseCompiler {
 				params.push("--debuginfo:on");
 			case _: 
 		}
+		switch defines.get("nim-checks") {
+			case null | "off": params.push("--checks:off");
+			case "on": params.push("--checks:on");
+		}
 		params.push(switch defines.get("nim-gc") {
 			case null: "--mm:orc";
 			case v: '--mm:$v';

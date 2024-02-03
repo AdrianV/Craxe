@@ -1,6 +1,7 @@
 import core.core
 import times
-import std/[cmdline,envvars]
+import std/[cmdline,envvars,random]
+
 
 export times.cpuTime
 export putEnv
@@ -12,6 +13,10 @@ template args*(): seq[string] = commandLineParams()
 template string*(v: Dynamic): system.string = $v
 
 template int*(v: float): int32 = v.int32
+
+template random*(max: int32): int32 =
+  rand(max).int32
+  
 
 template print*(v: Dynamic): void = write stdout, v
 

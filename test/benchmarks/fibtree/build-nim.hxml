@@ -3,6 +3,7 @@
 #-D nim-dynamic=enable
 #-D eval-stack
 -D nim-speed=fastest
--D nim-gc=orc
+#-D nim-gc=orc
+-D nim-gc=refc
 build.hxml
 

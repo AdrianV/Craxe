@@ -20,7 +20,7 @@ class TypeResolver {
 		"Bool" => "bool",
 		"Int" => "int32",
 		"Float" => "float",
-		"String" => "system.string",
+		"String" => "HaxeString",
 		"Void" => "void"
 	];
 
@@ -103,7 +103,7 @@ class TypeResolver {
 		if (name == "Null" && params.length == 1) {
 			final p0 = resolve(params[0]);
 			switch p0 {
-				case "bool" | "int32" | "float" | "system.string" : name = 'Null[$p0]';
+				case "bool" | "int32" | "float" | "HaxeString" : name = 'Null[$p0]';
 				case _: name = p0;
 			}
 		} else {

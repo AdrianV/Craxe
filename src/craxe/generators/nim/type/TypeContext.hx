@@ -102,7 +102,7 @@ class TypeContext {
 					anonById.set(ano.id, ano);
 					anonByName.set(ano.name, ano);
 				case v:
-					trace(v);
+					//trace(v);
 			}
 		}
 

@@ -8,6 +8,7 @@ import tools.tokenhash
 export tokenhash
 
 type
+    HaxeString* = system.string
     # Objects that can calculate self hash
     Hashable = concept x
        x.hash is proc():int
@@ -41,7 +42,7 @@ type
     Struct* = object of HaxeObject
 
 
-    ValueType* = bool | int32 | string | float | object 
+    ValueType* = bool | int32 | HaxeString | float | object 
 
     Null*[T: ValueType] = ref object of HaxeObject
         value*: T
@@ -91,7 +92,7 @@ type
     #        value: ptr V
 
     # Haxe String map
-    HaxeStringMap*[T] = HaxeMap[string, T]
+    HaxeStringMap*[T] = HaxeMap[HaxeString, T]
 
     # Haxe Int map
     HaxeIntMap*[T] = HaxeMap[int32, T]
@@ -102,7 +103,7 @@ type
     # --- Dynamic ---
 
     AnonField* = ref object
-        name*:string
+        name*:HaxeString
         value*:Dynamic
 
     # Dynamic proxy for real object
@@ -115,7 +116,7 @@ type
         case kind*: DynamicType
         of THaxe: discard
         of TString: 
-            fstring*: system.string
+            fstring*: HaxeString
         of TInt: 
             fint*:int32
         of TFloat: 
@@ -160,12 +161,12 @@ proc bmmOperator*[T](val:var T):T {.discardable, inline.} =
     dec(val)
     result = val
 
-proc toString*[T](this: T):string =
+proc toString*[T](this: T): HaxeString =
     this.repr
 
 # String
-template length*(this:string) : int =
-    len(this)
+template length*(this: HaxeString) : int32 =
+    len(this).int32
 
 # String
 template charAt*(this:string, pos:int) : string =
@@ -180,11 +181,12 @@ converter fromValue* [T: ValueType](v:T): Null[T] {.inline.} =
 converter fromValue* (v:int): Null[int32] {.inline.} =
     Null[int32](value: v.int32) 
 
-template indexOf* (s: string, sub: string): int32 =
+template indexOf* (s: HaxeString, sub: HaxeString): int32 =
     int32(s.find(sub))
 
-template indexOf* (s: string, sub: string, start: int32): int32 =
+template indexOf* (s: HaxeString, sub: HaxeString, start: int32): int32 =
     int32(s.find(sub), start)
+
 
 when false:
     template toNull* [T](v:typeof(nil)): Null[T] =
@@ -199,7 +201,7 @@ when false:
 #template `==`* [T] (v1:Null[T], n: typeof(nil)): bool =
 #    not v1.has
 
-template `==`* (v1:string, n: typeof(nil)): bool =
+template `==`* (v1: HaxeString, n: typeof(nil)): bool =
     false
 
 #template `.`* [T](v: Null[T], f: untyped) =
@@ -246,6 +248,11 @@ template valueBlock*(body : untyped) : untyped =
     (proc() : auto {.gcsafe.} = 
         body
     )()
+
+# --- Operators ---
+
+proc `|=`* (this: var int32, right: int32) {.inline.} =
+    this = this or right
 
 # --- Haxe Array ---
 
@@ -295,6 +302,9 @@ template pop*[T](this:var HaxeArray[T]): T = this.data.pop()
 
 template length*[T](this:HaxeArray[T]): int32 =    
     this.data.len.int32
+
+template `length=`*[T](this:HaxeArray[T], v: int32) =    
+    this.data.setLen(v)
 
 template `$`*[T](this:HaxeArray[T]) : string =
     $this.data

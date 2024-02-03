@@ -6,6 +6,7 @@ import craxe.common.ast.type.*;
 import haxe.ds.StringMap;
 import haxe.macro.Type;
 import craxe.common.ast.type.ClassInfo;
+using StringTools;
 
 /**
  * Build class result
@@ -36,16 +37,18 @@ class CommonAstPreprocessor {
 	 */
 	static final excludedTypes:StringMap<Bool> = [
 		"Std" => true, "Array" => true, "Reflect" => true, "EReg" => true, "ArrayAccess" => true, "String" => true,
-		"IntIterator" => true, "StringBuf" => true, "StringTools" => true, "Type" => true, "_EnumValue.EnumValue_Impl_" => true, "ValueType" => true,
+		"IntIterator" => true, "StringTools" => true, "Type" => true, "_EnumValue.EnumValue_Impl_" => true, "ValueType" => true,
 		"Encoding" => true, "Error" => true, "EnumValue_Impl_" => true, "File" => true, "FileInput" => true, "FileOutput" => true, "FileSeek" => true,
-		"Map" => true, "Xml" => true, "IMap" => true, "Nim" => true
+		"Map" => true, "Xml" => true, "IMap" => true, "Nim" => true,
+		//"StringBuf" => false, 
 	];
 
 	/**
 	 * Excluded modules
 	 */
-	static final excludedModules:Array<String> = ["haxe.CallStack", "haxe.Constraints", "haxe.Int32", "haxe.Int64", "haxe.Log", 
+	static final excludedModules:Array<String> = ["haxe.CallStack", "haxe.Constraints", "haxe.Int32-", "haxe.Int64", "haxe.Log", 
 		"haxe.MainLoop", "MainLoop", "haxe.EntryPoint", "EntryPoint",
+		"haxe.io.Bytes",
 		"haxe.NativeStackTrace", "haxe.StackItem", "haxe.SysTools", "Any", "Array", "StdTypes", "haxe.ds.Map", "haxe.exceptions."];
 
 	/**
@@ -54,11 +57,13 @@ class CommonAstPreprocessor {
 	function filterTypeByName(name:String, module:String):Bool {
 		//trace('$name from $module');
 		for (excl in excludedModules) {
-			if (module.indexOf(excl) >= 0)
+			if (module.startsWith(excl)) {
+				//trace('excluded $excl');
 				return true;
+			}
 		}
 
-		if (excludedTypes.exists(name))
+		if (excludedTypes.get(name))
 			return true;
 		//trace('     accepted  ----------------------');
 		return false;

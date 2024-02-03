@@ -217,7 +217,7 @@ class NimGenerator extends BaseGenerator {
 	 */
 	function generateEnumHelpers(sb:IndentStringBuilder, enumInfo:EnumInfo, constr:EnumField) {
 		var enumName = '${enumInfo.enumType.name}${constr.name}';
-		sb.add('proc `$`(this: ${enumName}) : system.string {.inline.} =');
+		sb.add('proc `$`(this: ${enumName}) : HaxeString {.inline.} =');
 		sb.addNewLine(Inc);
 		sb.add("return $this[]");
 		sb.addBreak();
@@ -319,7 +319,6 @@ class NimGenerator extends BaseGenerator {
 		sb.addNewLine(Inc);
 
 		for (td in typedefs) {
-			trace(td.typedefInfo.type);
 			switch (td.typedefInfo.type) {
 				case TInst(t, params):
 					final sparm = TypeResolver.resolveParameters(params);
@@ -344,8 +343,9 @@ class NimGenerator extends BaseGenerator {
 			sb.add('${an.name} = ref object of DynamicHaxeObject');
 			sb.addNewLine(Inc);
 			for (fld in an.fields) {
-				var ftp = TypeResolver.resolve(fld.type);
-				sb.add('${fld.name}:${ftp}');
+				final ftp = TypeResolver.resolve(fld.type);
+				final fname = NimNames.fixFieldVarName(fld.name);
+				sb.add('${fname}:${ftp}');
 				sb.addNewLine(Same);
 			}
 			sb.addNewLine(Dec);
@@ -355,8 +355,9 @@ class NimGenerator extends BaseGenerator {
 			//sb.add('instance: DynamicHaxeObjectRef');
 			sb.addNewLine(Same);
 			for (fld in an.fields) {
-				var ftp = TypeResolver.resolve(fld.type);
-				sb.add('${fld.name}: ptr ${ftp}');
+				final ftp = TypeResolver.resolve(fld.type);
+				final fname = NimNames.fixFieldVarName(fld.name);
+				sb.add('${fname}: ptr ${ftp}');
 				sb.addNewLine(Same);
 			}
 			sb.addNewLine(Dec);
@@ -387,7 +388,8 @@ class NimGenerator extends BaseGenerator {
 					sb.addNewLine(Inc);
 				else
 					sb.addNewLine(Same);
-				sb.add(', ${f.name}: addr v.${f.name}');
+				final fname = NimNames.fixFieldVarName(f.name);
+				sb.add(', ${fname}: addr v.${fname}');
 				first = false;
 			}
 			if (!first) sb.addNewLine(Dec);
@@ -409,7 +411,8 @@ class NimGenerator extends BaseGenerator {
 				else
 					sb.addNewLine(Same);
 				final tn = TypeResolver.resolve(f.type);
-				sb.add(', ${f.name}: adr[$tn](v.fanon, "${f.name}")');
+				final fname = NimNames.fixFieldVarName(f.name);
+				sb.add(', ${fname}: adr[$tn](v.fanon, "${fname}")');
 				first = false;
 			}
 			if (!first) sb.addNewLine(Dec);
@@ -422,7 +425,8 @@ class NimGenerator extends BaseGenerator {
 			sb.addNewLine(Inc);
 			if (an.fields.length > 0) {
 				for (fld in an.fields) {
-					sb.add('this.fields.insert("${fld.name}", fromField(this.${fld.name}))');
+					final fname = NimNames.fixFieldVarName(fld.name);
+					sb.add('this.fields.insert("${fname}", fromField(this.${fname}))');
 					sb.addNewLine(Same);
 				}
 			} else sb.add("discard");
@@ -553,7 +557,8 @@ class NimGenerator extends BaseGenerator {
 					case FVar(read, write):
 						if (f.expr != null) {
 							if (!first) sb.add(", ");
-							sb.add('${f.name} :');
+							final fname = NimNames.fixFieldVarName(f.name);
+							sb.add('${fname} :');
 							methodBodyGenerator.generateTBlockSingleExpression(sb, f.expr(), false);
 							first = false;
 						}
@@ -641,14 +646,14 @@ class NimGenerator extends BaseGenerator {
 				if (supportsDynamic) {
 					var fields = cls.classType.fields.get();
 
-					sb.add('proc getFields(this:${clsName}):HaxeArray[system.string] {.inline.} =');
+					sb.add('proc getFields(this:${clsName}):HaxeArray[HaxeString] {.inline.} =');
 					sb.addNewLine(Inc);
 					var fldNames = fields.map(x -> '"${x.name}"').join(", ");
-					sb.add('return HaxeArray[system.string](data: @[${fldNames}])');
+					sb.add('return HaxeArray[HaxeString](data: @[${fldNames}])');
 
 					sb.addBreak();
 					
-					sb.add('proc getFieldByNameInternal${params}(this:${clsName}, name:system.string):Dynamic =');
+					sb.add('proc getFieldByNameInternal${params}(this:${clsName}, name:HaxeString):Dynamic =');
 					sb.addNewLine(Inc);
 					if (fields.length > 0) {
 						sb.add("case name");
@@ -699,7 +704,7 @@ class NimGenerator extends BaseGenerator {
 					sb.add(", ");
 					sb.add(sbArgs.toString());
 				}
-				sb.add(') =');
+				sb.add('): ${clsName} {.discardable.} =');
 				sb.addNewLine(Inc);
 
 				if (cls.isHashable) {
@@ -707,8 +712,11 @@ class NimGenerator extends BaseGenerator {
 					sb.addNewLine(Same);
 				}
 				methodBodyGenerator.generateShadowAnons(sb, anons);
-
-				generateMethodBody(sb, cls, constrExp);
+				methodBodyGenerator.generateMethodBody(sb, cls, constrExp, null);
+				sb.addNewLine(Same);
+				sb.add("return this");
+				sb.addNewLine();
+				sb.addNewLine(None, true);
 				sb.addNewLine(Dec);	
 				MethodExpressionGenerator.scopes.popScope();
 				if (! isPure || supportsDynamic) {
@@ -727,9 +735,9 @@ class NimGenerator extends BaseGenerator {
 
 					if (supportsDynamic) {
 						sb.addNewLine(Same);
-						sb.add("this.getFields = proc():HaxeArray[system.string] = getFields(this)");
+						sb.add("this.getFields = proc():HaxeArray[HaxeString] = getFields(this)");
 						sb.addNewLine(Same);
-						sb.add("this.getFieldByName = proc(name:system.string):Dynamic = getFieldByNameInternal(this, name)");
+						sb.add("this.getFieldByName = proc(name:HaxeString):Dynamic = getFieldByNameInternal(this, name)");
 					}
 
 					sb.addNewLine(Same);
@@ -847,7 +855,7 @@ class NimGenerator extends BaseGenerator {
 			case KNormal | KModuleFields(_):
 				final clsName = getClassName(cls);
 				var params = TypeResolver.resolveParameters(cls.params);
-				sb.add('proc `$`$params(this:${clsName}) : system.string {.inline.} = ');
+				sb.add('proc `$`$params(this:${clsName}) : HaxeString {.inline.} = ');
 				sb.addNewLine(Inc);
 				sb.add('return "${clsName}"' + " & $this[]");
 				sb.addBreak();

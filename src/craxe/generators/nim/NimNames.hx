@@ -12,6 +12,7 @@ class NimNames {
 		"converter" => "vConverter",
 		"method" => "vMethod",
 		"proc" => "vProc",
+		"result" => "vResult",
 	];
 
 	static public inline function fixReserved(name: String) {
