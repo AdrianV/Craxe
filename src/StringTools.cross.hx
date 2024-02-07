@@ -28,4 +28,5 @@ extern class StringTools {
     public inline static function trim(s:String):String {
 		return ltrim(rtrim(s));
 	}    
+    public static function replace(s:String, sub:String, by:String):String;
 }

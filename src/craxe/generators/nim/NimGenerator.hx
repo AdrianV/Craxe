@@ -540,7 +540,7 @@ class NimGenerator extends BaseGenerator {
 			switch (field.kind) {
 				case FMethod(k):
 					hasStaticMethod = true;
-					break;
+					//break;
 				case FVar(read, write):
 					hasStaticVar = true;
 					break;

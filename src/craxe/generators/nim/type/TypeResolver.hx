@@ -6,6 +6,7 @@ import haxe.macro.Type;
 import haxe.macro.Type.EnumType;
 import haxe.macro.Type.AbstractType;
 import haxe.macro.Type.ClassType;
+import haxe.macro.TypeTools;
 
 using craxe.common.ast.MetaHelper;
 
@@ -259,7 +260,7 @@ class TypeResolver {
 	 */
 	public static function resolve(type:Type):String {
 		var sb = new StringBuf();
-		switch (type) {
+		switch TypeTools.followWithAbstracts(type) {
 			case TEnum(t, params):
 				generateTEnum(sb, t.get(), params);
 			case TInst(t, params):

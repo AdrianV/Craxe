@@ -1168,7 +1168,7 @@ class MethodExpressionGenerator {
 	 */
 	function generateTFieldFStatic(sb:IndentStringBuilder, classType:ClassType, classField:ClassField) {
 		var fieldData = getStaticTFieldData(classType, classField);
-		switch (classField.type) {
+		switch TypeTools.followWithAbstracts(classField.type) {
 			case TFun(_, _):
 				sb.add(TypeResolver.resolve(classField.type));
 				sb.add("= ");
@@ -1275,7 +1275,8 @@ class MethodExpressionGenerator {
 				//trace('skip ident $s for now'); //TODO fix it
 				sb.add(s);
 			case v:
-				throw 'Unsupported ${v}';
+				generateTBlockSingleExpression(sb, expression, false);
+				//throw 'Unsupported ${v}';
 		}
 
 		switch (access) {

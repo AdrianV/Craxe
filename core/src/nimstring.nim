@@ -1,6 +1,5 @@
 import std/[strutils, uri]
 import strformat
-export startsWith
 import core/core
 
 type
@@ -14,6 +13,12 @@ proc urlDecode*(this:typedesc[StringTools], s:HaxeString): HaxeString =
 
 template endsWith*(this:typedesc[StringTools], s:HaxeString, send: HaxeString): bool =
   strutils.endsWith(s, send)
+
+template replace*(this:typedesc[StringTools]; s, sub, by: HaxeString): HaxeString =
+  strutils.replace(s, sub, by)
+
+template startsWith*(this:typedesc[StringTools], s:HaxeString, send: HaxeString): bool =
+  strutils.startsWith(s, send)
 
 template contains*(this:typedesc[StringTools], s:HaxeString, sub: HaxeString): bool =
   strutils.contains(s, sub)

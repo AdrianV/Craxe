@@ -140,6 +140,8 @@ type
 
     NullAccess* = object of CatchableError
 
+    Reflect* = object
+
 # Core procedures
 # a++
 proc apOperator*[T](val:var T):T {.discardable, inline.} =        
@@ -541,6 +543,9 @@ converter toDynamic*[T: DynamicHaxeObjectRef](v:T): Dynamic {.inline.} =
 converter toDynamic*[T: DynamicHaxeWrapper](v: T): Dynamic {.inline.} = 
     return newDynamic(v)
 
+converter toDynamic*(v: ValueType): Dynamic {.inline.} = 
+    newDynamic(v)
+
 template toDynamic*(this:untyped):untyped =
     newDynamic(this)
 
@@ -864,4 +869,86 @@ proc fromField* [T](field: var T): AnonNextGen =
     elif T is DynamicHaxeWrapper: AnonNextGen(fanonType: atStaticAnonWrapper, fstatic: addr field)
     elif T is Dynamic: AnonNextGen(fanonType: atDynamic, fdynamic: field)
     elif T is HaxeObjectRef: AnonNextGen(fanonType: atStaticInstance, fstatic: addr field)
+
+
+# ------------------------- Reflect ---------------------------------------------------------
+# TODO: handle changed names properly
+
+proc fixName(name: HaxeString) : HaxeString =
+    let nimReserved {.global.} = {
+        "block": "vBlock",
+        "const": "vConst",
+        "let": "vLet",
+        "yield": "vYield",
+        "iterator": "vIterator",
+        "converter": "vConverter",
+        "method": "vMethod",
+        "proc": "vProc",
+        "result": "vResult",
+    }.toTable    
+    template fixReserved (name: HaxeString) : HaxeString =
+        let fix = nimReserved.getOrDefault(name)
+        if fix != "":
+            fix
+        else:
+            name
+
+    return if startsWith(name, "__"):
+        "fs_" & name.substr(2)
+    else:
+        if startsWith(name, '_'):
+            "f_" & name.substr(1)
+        else:
+            let name = strutils.replace(name, "__", "")
+            fixReserved(name)
+
+proc hasField*(this: typedesc[Reflect], o: DynamicHaxeObjectRef | DynamicHaxeWrapper, name: HaxeString): bool =
+    when o is DynamicHaxeObjectRef:
+        checkDynamic(o)
+    return o.fields.get(name.fixName) != nil
+
+proc field*(this: typedesc[Reflect], o: DynamicHaxeObjectRef | DynamicHaxeWrapper, name: HaxeString): Dynamic =
+    when o is DynamicHaxeObjectRef:
+        checkDynamic(o)
+    return getFieldByName(o, name.fixName)
+
+proc fields*(this: typedesc[Reflect], o: DynamicHaxeObjectRef | DynamicHaxeWrapper): HaxeArray[HaxeString] =
+    when o is DynamicHaxeObjectRef:
+        checkDynamic(o)
+    result = HaxeArray[HaxeString](data: newSeqOfCap[HaxeString](o.fields.len))
+    for f in o.fields: 
+        if f != nil : result.data.add($f.thash)
+
+proc setField*(this: typedesc[Reflect], o: DynamicHaxeObjectRef | DynamicHaxeWrapper, name: HaxeString, value:Dynamic): void =
+    when o is DynamicHaxeObjectRef:
+        checkDynamic(o)
+    setFieldByName(o, name.fixName, value)
+
+proc compare*(this: typedesc[Reflect], a,b: int32): int32 {.inline.} = 
+    return a - b
+
+proc compare*(this: typedesc[Reflect], a,b: HaxeString): int32 {.inline.} = 
+    return cmp(a, b).int32
+
+proc compare*(this: typedesc[Reflect], a,b: float): int32 {.inline.} = 
+    return cmp(a, b).int32
+
+proc compare*(this: typedesc[Reflect], a,b: bool): int32 {.inline.} = 
+    return cmp(a, b).int32
+
+proc compare*(this: typedesc[Reflect], a,b: Dynamic): int32 = 
+    template cantCompare(): int32 = -1
+    case a.kind:
+    of TInt: 
+        if b.kind == TInt : return cmp(a.fint, b.fint).int32
+        if b.kind == TFloat : return cmp(a.fint.float, b.ffloat).int32
+    of TFloat:    
+        if b.kind == TFloat : return cmp(a.ffloat, b.ffloat).int32
+        if b.kind == TInt : return cmp(a.ffloat, b.fint.float).int32
+    of TString:    
+        if b.kind == TString : return cmp(a.fstring, b.fstring).int32
+    of TBool:    
+        if b.kind == TBool : return cmp(a.fbool, b.fbool).int32
+    else: discard
+    return cantCompare()
 
