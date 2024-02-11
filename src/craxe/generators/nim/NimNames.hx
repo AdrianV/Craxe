@@ -31,4 +31,13 @@ class NimNames {
 			else if (name.startsWith("_")) "f_" + name.substr(1) 
 			else fixReserved(name.replace("__", ""));
 	}
+
+	static public function fixStaticFieldVarName(name:String):String {
+		var res = if (name.startsWith("__")) "sy_" + name.substr(2);
+			else {
+				if (name.startsWith("_")) name.substr(1);
+				else name;
+			}
+		return fixReserved(res.replace("__", ""));
+	}
 }

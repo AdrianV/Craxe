@@ -1,5 +1,14 @@
 package test;
 
+class Foo {
+    var f: Map<String,String> = new Map();
+    public inline function new() {}
+
+    public function add(k: String, v: String) {
+        f.set(k, v);
+    }
+}
+
 class TestMap {
 
     static function testMap() {
@@ -19,6 +28,9 @@ class TestMap {
     }
 
     static function main() {
+        final f = new Foo();
+        f.add("Foo", "Bar");
+        trace(f);
         testMap();
     }
     

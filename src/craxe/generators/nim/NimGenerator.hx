@@ -468,11 +468,15 @@ class NimGenerator extends BaseGenerator {
 	function generateClassInfo(sb:IndentStringBuilder, cls:ClassInfo, clsName: String) {
 		//var params = TypeResolver.resolveParameters(cls.params);
 
+		#if (false)
 		var baseTypeName = if (TypeContext.isDynamicSupported(clsName)) {
 			"DynamicHaxeObject";
 		} else {
 			"HaxeObject";
 		}
+		#else
+		var baseTypeName = "HaxeObject";
+		#end
 		final superCls = cls.classType.superClass;
 		var superName = if (superCls != null) {
 			var superType = superCls.t.get();
@@ -490,10 +494,23 @@ class NimGenerator extends BaseGenerator {
 			sb.addNewLine(Same);
 			generateInstanceFields(sb, cls.fields, cls.isHashable);	
 		}
-
+		function addStatic(name: String): String {
+			final pos = name.indexOf("[");
+			if (pos < 0)
+				return name + 'Static';
+			else
+				return name.substr(0, pos - 1) + 'Static' + name.substr(pos);
+			
+		}
+		if (superName == baseTypeName) 
+			superName = 'HaxeStaticObject';
+		else {
+			superName = addStatic(superName);
+		}
 		var staticFields = cls.classType.statics.get();
-		if (staticFields.length > 0) {
-			var line = '${clsName}Static = object of HaxeObject';
+		//if (staticFields.length > 0) {
+		if ((superCls == null || superCls.params.length == 0) && cls.params.length == 0) {
+			var line = '${addStatic(clsName)} = object of ${superName}';
 			sb.add(line);
 			sb.addNewLine(Same);
 			//sb.addNewLine(Same, true);
@@ -549,10 +566,16 @@ class NimGenerator extends BaseGenerator {
 			}
 		}
 
-		if (hasStaticVar) {
+		if (cls.params.length == 0) { // TODO: handle staticInst for generic classes
 			sb.add('let ${clsName}StaticInst = ${clsName}Static(');
+			var first = true;
+			final superCls = cls.classType.superClass;
+			if (superCls != null) {
+				final superName = TypeResolver.resolveClassType(superCls.t.get(), superCls.params);
+				sb.add('fparent: addr ${superName}StaticInst');
+				first = false;
+			}
 			if (hasStaticVar) {
-				var first = true;
 				for (f in staticFields) switch f.kind {
 					case FVar(read, write):
 						if (f.expr != null) {
@@ -689,7 +712,8 @@ class NimGenerator extends BaseGenerator {
 					sb.add(sbArgs.toString());
 					sb.add(') : ${clsName} =');
 					sb.addNewLine(Inc);
-					sb.add('${clsName}(kind: TAnon, ');
+					//sb.add('${clsName}(kind: TAnon, ');
+					sb.add('${clsName}(');
 					cls.constrParams = buildPureConstructor(sb, constrExp);
 					sb.add(")");
 					sb.addNewLine(Dec);

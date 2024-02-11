@@ -26,7 +26,7 @@ class ContextMacro {
     public static function ckeckDynamicSupport() {
         #if macro
         if (dynIsSupported == null)
-            dynIsSupported = Context.getDefines().get("nim-dynamic") == "enable";
+            dynIsSupported = Context.getDefines().get("nim-dynamic") != "disable";
         if (dynIsSupported)
             return;
         Context.fatalError("Dynamic is restricted. Please, add -D nim-dynamic=enable to your configuration, or remove all Dynamic type from the code.", Context.currentPos());

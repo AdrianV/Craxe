@@ -1,3 +1,6 @@
+{.experimental: "codeReordering".}
+
+
 import core
 
 type
@@ -6,13 +9,21 @@ type
     HaxeBytes* = ref object of HaxeObject
         b*: seq[byte]
 
-    HaxeBytesStatic = object
-
-let HaxeBytesStaticInst* = HaxeBytesStatic()
+    HaxeBytesStatic = object of HaxeStaticObject
 
 # Bytes
+
+#proc toString(this: HaxeBytesStatic, o: HaxeObjectRef): String =
+#    return 
+
+proc toHex*(this: HaxeBytes): HaxeString
+
+let HaxeBytesStaticInst* = HaxeBytesStatic(fparent: nil, fname: "haxe.io.Bytes",
+                                ftoString: proc(o: HaxeObjectRef): HaxeString {.closure} = return cast[HaxeBytes](o).toHex)
+
+
 template alloc*(this:typedesc[HaxeBytes], size:int) : HaxeBytes =
-    HaxeBytes(b: newSeq[byte](size));
+    HaxeBytes(fstatic: addr HaxeBytesStaticInst,b: newSeq[byte](size));
 
 proc ofString*(this:typedesc[HaxeBytes], s: HaxeString) : HaxeBytes =
     result = HaxeBytes(b: newSeq[byte](s.len))
@@ -115,8 +126,8 @@ proc toHex*(this: openArray[byte]): HaxeString =
 template toHex*(this: HaxeBytesData): HaxeString =
     toHex(this[])
 
-template toHex*(this: HaxeBytes): HaxeString =
-    toHex(this.b)
+proc toHex*(this: HaxeBytes): HaxeString =
+    return this.fstatic.fname & "(" & toHex(this.b) & ")"
 
 # proc newHaxeBytes*()
 

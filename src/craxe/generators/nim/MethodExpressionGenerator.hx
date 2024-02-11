@@ -33,6 +33,8 @@ enum TypeMix {
 	FirstString;
 	SecondString;
 	StringString;
+	DynamicAndTInst;
+	TInstAndDynamic;
 }
 
 typedef VarInfo = {
@@ -323,7 +325,7 @@ class MethodExpressionGenerator {
 	} {
 		var className = "";
 
-		var fieldName = classField.name;
+		var fieldName = NimNames.fixStaticFieldVarName(classField.name);
 		var totalName = "";
 		final Static = switch classField.kind {
 			case FVar(read, write): 'StaticInst';
@@ -408,12 +410,12 @@ class MethodExpressionGenerator {
 		totalName:String
 	} {
 		var className = TypeResolver.resolveClassType(classType, params);
-		var fieldName:String = classField.meta.getMetaValue(":native");
+		var fieldName:String = classField.meta.getMetaValue(":native"); // TODO: shouldn't native names also get fixed ?
 		if (fieldName == null) {
 			//if (follow && isNullT(classField.type)) {
 			//	fieldName = NimNames.fixFieldVarName(TypeResolver.getFixedTypeName(classField.name)) + ".value";
 			//} else
-				fieldName = NimNames.fixFieldVarName(TypeResolver.getFixedTypeName(classField.name));
+				fieldName = NimNames.fixFieldVarName(classField.name);
 		}
 
 		if (classType.isInterface) {
@@ -532,14 +534,15 @@ class MethodExpressionGenerator {
 
 		sb.add(varTypeName);
 		sb.add("(");
-		if (isPure) sb.add('kind: TAnon');
+		//if (isPure) sb.add('kind: TAnon');
 		var isFirst = ! isPure;
 		for (i in 0 ... elements.length) {
 			if (! isFirst) sb.add(', ');
 			isFirst = false;
 			if (isPure) sb.add(clsInfo.constrParams[i] + ': ');
 			final expr = elements[i];
-
+			generateTBlockSingleExpression(sb, expr, false);
+			#if (false)
 			switch (expr.expr) {
 				case TConst(c):
 					generateTConst(sb, c, expr.t);
@@ -562,6 +565,7 @@ class MethodExpressionGenerator {
 				case v:
 					throw 'Unsupported ${v}';
 			}
+			#end
 		}
 		sb.add(")");
 	}
@@ -983,7 +987,7 @@ class MethodExpressionGenerator {
 	function generateTBinop(sb:IndentStringBuilder, op:Binop, e1:TypedExpr, e2:TypedExpr) {
 		binOpLevel++;
 		final ovd = pushVoid(false);
-		final needBrackets = (switch op {
+		final needBrackets = (binOpLevel > 1) || (switch op {
 			case OpBoolOr | OpShr | OpShl | OpUShr | OpOr | OpAnd  : true;
 			case OpAssign:
 				switch e1.expr {
@@ -995,7 +999,7 @@ class MethodExpressionGenerator {
 				false;
 			case _: 
 				false;
-		} ) || (binOpLevel > 1);
+		} );
 		if (needBrackets) sb.add("(");
 		final typMix: TypeMix  = switch op {
 			case OpUShr: FirstUInt; 
@@ -1007,6 +1011,8 @@ class MethodExpressionGenerator {
 				else if (e2.t.isString()) SecondString
 				else if (e1.t.isFloat() && e2.t.isInt()) FloatInt
 				else if (e1.t.isInt() && e2.t.isFloat()) IntFloat
+				else if (e1.t.isDynamic() && e2.t.isInst()) DynamicAndTInst
+				else if (e1.t.isInst() && e2.t.isDynamic()) TInstAndDynamic
 				else None;
 			case OpMult | OpDiv | OpSub | OpEq | OpNotEq | OpGt |
 				OpGte | OpLt | OpLte | OpMod :
@@ -1024,6 +1030,8 @@ class MethodExpressionGenerator {
 		switch typMix {
 			case IntFloat | SecondString: if ( !op.match(OpAssign) && !op.match(OpAssignOp(_))) sb.add(")");
 			case FirstUInt: sb.add(".uint32");
+			case TInstAndDynamic: 
+				//sb.add('.fromDynamic(${TypeResolver.resolve(e1.t)})');
 			case _:
 		}
 		sb.add(" ");
@@ -1101,6 +1109,8 @@ class MethodExpressionGenerator {
 		switch typMix {
 			case FloatInt: sb.add("toFloat(");
 			case FirstString: sb.add("$(");
+			case TInstAndDynamic:
+				sb.add('fromDynamic(');				
 			//case IntFloat if (op.match(OpAssign) || op.match(OpAssignOp(_))): 
 			case _:
 		}
@@ -1113,6 +1123,7 @@ class MethodExpressionGenerator {
 		}
 		switch typMix {
 			case FloatInt | FirstString: sb.add(")");
+			case TInstAndDynamic: sb.add(', ${TypeResolver.resolve(e1.t)})');
 			case IntFloat:
 				switch op {
 					case OpAdd | OpAssign | OpAssignOp(_):

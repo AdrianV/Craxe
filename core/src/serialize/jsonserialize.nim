@@ -46,7 +46,7 @@ proc parseNode(node:JsonNode):Dynamic =
     of JString:
         return toDynamic(node.getStr())
     of JInt:
-        return toDynamic(node.getInt())
+        return toDynamic(node.getInt().int32)
     of JFloat:
         return toDynamic(node.getFloat())
     else:

@@ -31,27 +31,37 @@ type
 
     FieldTable* = TokenTable[AnonNextGen]
 
-    # Main object for all haxe objects
-    HaxeObject* = object of RootObj
-        kind*: DynamicType
+    # Root object for all haxe objects
+    HaxeBaseObject* = object of RootObj
+
+    # Root object for Static instances
+    HaxeStaticObject* = object of HaxeBaseObject
+        fparent*: ptr HaxeStaticObject
+        # fields*: FieldTable
+        fname*: string
+        ftoString*: proc(o: HaxeObjectRef): HaxeString {.closure.}
 
     # Main object for all haxe referrence objects
+    HaxeObject* = object of HaxeBaseObject
+        fstatic*: ptr HaxeStaticObject
+
     HaxeObjectRef* = ref HaxeObject
 
     # Value object
-    Struct* = object of HaxeObject
+    Struct* = object of HaxeBaseObject
 
 
     ValueType* = bool | int32 | HaxeString | float | object 
 
-    Null*[T: ValueType] = ref object of HaxeObject
+    Null*[T: ValueType] = ref object of HaxeBaseObject
         value*: T
 
 
     NullAbstr*[T] = Null[T]
 
     # Dynamic object with access to fields by name
-    DynamicHaxeObjectBase* = object of HaxeObject
+    DynamicHaxeObjectBase* = object of HaxeBaseObject
+        kind*: DynamicType
         fields*: FieldTable
 
     DynamicHaxeObject* = object of DynamicHaxeObjectBase
@@ -72,13 +82,13 @@ type
         arr:HaxeArray[T]
         currentPos:int
 
-    HaxeArray*[T] = ref object of HaxeObject
+    HaxeArray*[T] = ref object of HaxeBaseObject
         data*:seq[T]
 
     # --- Haxe Map
 
     # Base map
-    HaxeMap*[K, V] = ref object of HaxeObject
+    HaxeMap*[K, V] = ref object of HaxeBaseObject
         data*:Table[K, V]
 
     # HaxeKeyValue*[K,V] = ref object of HaxeObject
@@ -135,7 +145,7 @@ type
     # --- Haxe Enum ---
 
     # Haxe enum
-    HaxeEnum* = ref object of HaxeObject
+    HaxeEnum* = ref object of HaxeBaseObject
         index*:int
 
     NullAccess* = object of CatchableError
@@ -162,6 +172,11 @@ proc ammOperator*[T](val:var T):T {.discardable, inline.} =
 proc bmmOperator*[T](val:var T):T {.discardable, inline.} =        
     dec(val)
     result = val
+
+proc toString*(this: HaxeObjectRef): HaxeString =
+    if this.fstatic != nil and this.fstatic.ftoString != nil:
+        return this.fstatic.ftoString(this)
+    return this.repr
 
 proc toString*[T](this: T): HaxeString =
     this.repr
@@ -495,11 +510,15 @@ template newDynamic*(value: DynamicHaxeWrapper):Dynamic =
     checkDynamic(value)
     Dynamic(kind:TAnonWrapper, fwrapper: value)
 
-template newDynamic*[T:HaxeObjectRef](value: T):Dynamic =
+template newDynamic*[T: ref HaxeBaseObject](value: T):Dynamic =
     when T is DynamicHaxeObjectRef:
         checkDynamic(value)
+        # echo "TAnon"
         Dynamic(kind:TAnon, fanon: value)
+    elif T is DynamicHaxeWrapper:
+        Dynamic(kind:TAnonWrapper, fwrapper: value)
     else:
+        # echo "TClass ", value.isNil
         Dynamic(kind:TClass, fclass: value)
 
 # template newDynamic*[T:DynamicHaxeObjectRef](value: T):Dynamic =
@@ -546,8 +565,11 @@ converter toDynamic*[T: DynamicHaxeWrapper](v: T): Dynamic {.inline.} =
 converter toDynamic*(v: ValueType): Dynamic {.inline.} = 
     newDynamic(v)
 
-template toDynamic*(this:untyped):untyped =
-    newDynamic(this)
+converter toDynamic*[T:HaxeObjectRef](value: T):Dynamic {.inline.} =
+    newDynamic(value)
+
+#template toDynamic*(this:untyped):untyped =
+#    newDynamic(this)
 
 proc fromDynamic*[T](this:Dynamic, t:typedesc[T]) : T =
     if this == nil:
@@ -594,6 +616,8 @@ proc fromDynamic*[T](this:Dynamic, t:typedesc[T]) : T =
             else :
                 echo "warning ", t.name
                 T.default
+        of TClass:
+            cast[T](this.fclass)
         else:
             echo "Dynamic wrong type"
             # raise newException(ValueError, "Dynamic wrong type")

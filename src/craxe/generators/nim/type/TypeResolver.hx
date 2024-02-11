@@ -55,7 +55,22 @@ class TypeResolver {
 			case _: false;
 		}
 
-
+	static public inline function isDynamic(t: Type) 
+		return switch TypeTools.followWithAbstracts(t) {
+			case TDynamic(_) : true;
+			case _: false;
+		}
+	static public function isInst(t: Type) {
+		return switch TypeTools.followWithAbstracts(t) {
+			case TInst(t, _) : 
+				switch t.get().name {
+					case "Bool", "Int", "Float", "String" : false;
+					default : true;
+				};
+			case _: false;
+		}
+	}
+	
 	/**
 	 * Generate simple type
 	 */
@@ -135,6 +150,7 @@ class TypeResolver {
 			}
 		};
 		sb.add(typeName);
+		//if (postFix != null) sb.add(postFix);
 		if (params != null && params.length > 0) {						
 			sb.add(resolveParameters(params));
 		}
@@ -260,7 +276,15 @@ class TypeResolver {
 	 */
 	public static function resolve(type:Type):String {
 		var sb = new StringBuf();
-		switch TypeTools.followWithAbstracts(type) {
+		switch type {
+			case TAbstract(t, _) :
+				final tt = t.get();
+				if (tt.name != "Null" || tt.module != "StdTypes") 
+					type = TypeTools.followWithAbstracts(type);
+			default:
+				type = TypeTools.followWithAbstracts(type);
+		}
+		switch type {
 			case TEnum(t, params):
 				generateTEnum(sb, t.get(), params);
 			case TInst(t, params):
@@ -280,7 +304,6 @@ class TypeResolver {
 			case v:			
 				throw 'Unsupported type ${v}';
 		}
-
 		return sb.toString();
 	}
 }
