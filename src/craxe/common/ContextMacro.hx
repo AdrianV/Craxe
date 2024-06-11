@@ -20,6 +20,12 @@ class ContextMacro {
     }
 
     static var dynIsSupported: Null<Bool> = null;
+
+    public static function isDynamicSupported(): Bool {
+        ckeckDynamicSupport();
+        return dynIsSupported;
+    }
+
     /**
      * Check if dynamic supported and throw exception if not
      */

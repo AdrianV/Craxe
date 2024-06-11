@@ -13,17 +13,17 @@ let JsonPrinterStaticInst* = JsonPrinterStatic()
 
 proc printObject(obj:Dynamic):string =    
     let fields = obj.getFieldNames()
-    if fields.isNil or fields.length < 1:    
+    if fields.len < 1:    
         return "{}"
     
     result = "{"
-    for i in 0..<fields.length:
+    for i in 0..<fields.len:
         if result.len > 1: result.add(", ")
 
         let fieldName = fields[i]
         result.addQuoted(fieldName)
         result.add(": ")
-        let val = obj{fieldName}
+        let val = obj{$fieldName}
         case val.kind
         of TString:
             result.add("\"" & $val & "\"")
@@ -35,16 +35,16 @@ proc printObject(obj:Dynamic):string =
 proc parseNode(node:JsonNode):Dynamic =
     case node.kind
     of JObject:
-        var res = DynamicHaxeObjectRef()
+        var res = DynamicHaxeWrapper() # DynamicHaxeObjectRef()
         # var keys = toSeq(node.fields.keys)        
         # var res = newAnonObject(keys)
         # var i = 0        
         for key, val in node.fields.pairs():
             res.setFieldByName(key, parseNode(val))
             # inc(i)
-        return Dynamic(kind:TAnon, fanon: res)
+        return res.toDynamic
     of JString:
-        return toDynamic(node.getStr())
+        return toDynamic(node.getStr().toXString)
     of JInt:
         return toDynamic(node.getInt().int32)
     of JFloat:

@@ -257,6 +257,7 @@ class Main {
 
     static function testEnumExpr() {
         var e = Some("23");
+        trace(e);
         trace((switch e {
             case Some(value): value;
             case Other(value): value;

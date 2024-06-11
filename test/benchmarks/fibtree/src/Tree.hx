@@ -1,3 +1,4 @@
+@:nim.Pragma("acyclic")
 class FibNode {
   var n1: FibNode;
   var n2: FibNode;

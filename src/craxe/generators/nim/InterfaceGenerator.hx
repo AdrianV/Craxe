@@ -24,7 +24,7 @@ class InterfaceGenerator {
 		for (field in interfaceInfo.fields) {
 			sb.add(", ");
 			sb.addNewLine(Same);
-			sb.add(NimNames.fixFieldVarName(field.name));
+			sb.add(NimNames.normalize(field.name));
 			sb.add(" : ptr ");
 			sb.add(TypeResolver.resolve(field.type));
 		}
@@ -69,7 +69,7 @@ class InterfaceGenerator {
 		sb.add("obj: this");
 
 		for (field in interfaceInfo.fields) {
-			final fname = NimNames.fixFieldVarName(field.name);
+			final fname = NimNames.fixed(field.name);
 			sb.add(", ");
 			sb.addNewLine(Same);
 			sb.add(fname);

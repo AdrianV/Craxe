@@ -1,3 +1,4 @@
+
 @:require("nimstring")
 @:native("StringTools")
 extern class StringTools {
@@ -18,10 +19,7 @@ extern class StringTools {
 
     public static function hex(n:Int, ?digits:Int): String;
 
-    public static inline function isSpace(s:String, pos:Int):Bool {
-        final c = fastCodeAt(s, pos);
-        return (c > 8 && c < 14) || c == 32;
-    }
+    public static function isSpace(s:String, pos:Int):Bool;
 
     public static function ltrim(s:String):String;
     public static function rtrim(s:String):String;
@@ -29,4 +27,14 @@ extern class StringTools {
 		return ltrim(rtrim(s));
 	}    
     public static function replace(s:String, sub:String, by:String):String;
+    public static inline function isEof(c: Int) {
+        return c == 0;
+    }
+
+    @:native("iter")
+    public static function iterator(s:String):Iterator<Int>;
+    public static function keyValueIterator(s:String):KeyValueIterator<Int, Int>;
+    public static function lpad(s:String, c:String, l:Int):String;
+    public static function rpad(s:String, c:String, l:Int):String;
+
 }

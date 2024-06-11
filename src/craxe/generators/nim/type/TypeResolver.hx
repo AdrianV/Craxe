@@ -21,7 +21,7 @@ class TypeResolver {
 		"Bool" => "bool",
 		"Int" => "int32",
 		"Float" => "float",
-		"String" => "HaxeString",
+		//"String" => "HaxeString",
 		"Void" => "void"
 	];
 
@@ -37,27 +37,38 @@ class TypeResolver {
 		return simpleTypes.exists(name);
 	}
 
-	static public inline function isInt(t: Type) 
-		return switch t {
+	static public function isBool(t: Type) 
+		return switch TypeTools.followWithAbstracts(t) {
+			case TInst(_.get().name => "Bool", _) | TAbstract(_.get().name => "Bool", _): true;
+			case _: false;
+		}
+
+	static public function isInt(t: Type) 
+		return switch TypeTools.followWithAbstracts(t) {
 			case TInst(_.get().name => "Int", _) | TAbstract(_.get().name => "Int", _): true;
 			case _: false;
 		}
 
-	static public inline function isFloat(t: Type) 
+	static public function isFloat(t: Type) {
+		final t = TypeTools.followWithAbstracts(t);
 		return switch t {
-			case TInst(_.get().name => "Float", _) | TAbstract(_.get().name => "Float", _): true;
+			case TInst(_.get().name => "Float", _) | TAbstract(_.get().name => "Float", _) : true;
 			case _: false;
 		}
+	}
 
 	static public inline function isString(t: Type) 
-		return switch t {
-			case TInst(_.get().name => "String", _) | TAbstract(_.get().name => "String", _): true;
+		return switch TypeTools.followWithAbstracts(t) {
+			case TInst(_.get().name => "String", _) | TAbstract(_.get().name => "String", _) : true;
 			case _: false;
 		}
 
 	static public inline function isDynamic(t: Type) 
 		return switch TypeTools.followWithAbstracts(t) {
 			case TDynamic(_) : true;
+			case TMono(t): true;
+				//final tt = t.get();
+				//tt.match(TDynamic(_));
 			case _: false;
 		}
 	static public function isInst(t: Type) {
@@ -70,6 +81,40 @@ class TypeResolver {
 			case _: false;
 		}
 	}
+
+	static public function isVoid(t:Type): Bool {
+		//trace(TypeTools.follow(t));
+		return switch TypeTools.follow(t) {
+			case TAbstract(t, _), TFun(_, TAbstract(t,_)) :
+				final tt = t.get();
+				if (tt.module == "StdTypes") 
+					switch (tt.name) {
+						case "Void": true;
+						case "Null": 
+							isVoid(tt.params[0].t);
+							//final nt: Type = tt.params[0].t
+						case _: false;
+					}
+				else false;
+			case TType(t, _):
+				isVoid(t.get().type);
+			case TFun(_, ret):
+				isVoid(ret);
+			case _: 
+				false;
+		}
+	}
+
+	static public function isIterator(type: Type): Bool {
+		switch TypeTools.followWithAbstracts(type) {
+			case TAnonymous(a):
+				final object = context.getObjectTypeByFields(a.get().fields);
+				return object.iterRet != null;
+			default:
+		}
+		return false;
+	}
+
 	
 	/**
 	 * Generate simple type
@@ -102,13 +147,15 @@ class TypeResolver {
 	 * Generate TEnum
 	 */
 	static function generateTEnum(sb:StringBuf, enumType:EnumType, params:Array<Type>) {
-		sb.add(getFixedTypeName(enumType.name));
+		final info = context.getEnumByType(enumType); //
+		final sp = resolveParameters(info.params);
+		sb.add(info.enumName + (sp != "" ? 'Enum${sp}' : ""));
 	}
 
 	/**
 	 * Generate TAbstract
 	 */
-	static function generateTAbstract(sb:StringBuf, t:AbstractType, params:Array<Type>) {
+	static public function generateTAbstract(sb:StringBuf, t:AbstractType, params:Array<Type>) {
 		if (generateSimpleType(sb, t.name))
 			return;
 
@@ -119,7 +166,7 @@ class TypeResolver {
 		if (name == "Null" && params.length == 1) {
 			final p0 = resolve(params[0]);
 			switch p0 {
-				case "bool" | "int32" | "float" | "HaxeString" : name = 'Null[$p0]';
+				case "bool" | "int32" | "float" : name = 'Null[$p0]';
 				case _: name = p0;
 			}
 		} else {
@@ -127,6 +174,13 @@ class TypeResolver {
 			switch name {
 				case "Async":
 					name = 'Future${parstr} {.async.}';
+				case "Enum" if (parstr == "[Dynamic]"):
+					name = 'EnumAbstr[HaxeEnum]';// "core.TypeIndex";
+				case "Class" if (parstr == "[Dynamic]"):
+					name = 'ClassAbstr[HaxeObjectRef]';// "core.TypeIndex";
+				case "Enum" | "Class" if (params.length == 1):
+					//name = name.substr(1, name.length -2); 
+					name = '${name}Abstr${parstr}';	
 				default:
 					name = '${name}Abstr${parstr}';	
 			}
@@ -135,9 +189,9 @@ class TypeResolver {
 	}
 
 	/**
-	 * Generate TInst
+	 * get basic type name without params
 	 */
-	static function generateTInst(sb:StringBuf, t:ClassType, params:Array<Type>) {
+	static public function generateTypeName(sb:StringBuf, t:ClassType) {
 		if (generateSimpleType(sb, t.name))
 			return;
 
@@ -150,10 +204,20 @@ class TypeResolver {
 			}
 		};
 		sb.add(typeName);
-		//if (postFix != null) sb.add(postFix);
+	}
+
+	static public function appendTypeParams(sb:StringBuf, params:Array<Type>) {
 		if (params != null && params.length > 0) {						
 			sb.add(resolveParameters(params));
 		}
+	}
+
+	/**
+	 * Generate TInst
+	 */
+	static function generateTInst(sb:StringBuf, t:ClassType, params:Array<Type>) {
+		generateTypeName(sb, t);
+		appendTypeParams(sb, params);
 	}
 
 	/**
@@ -171,10 +235,17 @@ class TypeResolver {
 	 */
 	static function generateTFun(sb:StringBuf, args:Array<ArgumentInfo>, ret:Type) {
 		sb.add("proc(");
-		sb.add(args.map(x -> '${x.name}:${resolve(x.t)}').join(", "));
+		inline function get(x: ArgumentInfo) {
+			final tn = resolve(x.t);
+			return switch x.t {
+				case TAnonymous(a):	tn + 'Wrapper';
+				default: tn;
+			}
+		}
+		sb.add(args.map(x -> '${x.name != "" ? x.name : "_"}:${get(x)}').join(", "));
 		sb.add("):");
 		sb.add(resolve(ret));
-		sb.add(' {.closure.}');
+		//sb.add(' {.closure.}');
 	}
 
 	/**
@@ -217,21 +288,9 @@ class TypeResolver {
 			case "Bytes":
 				return "HaxeBytes";
 		}
-
 		return name;
 	}
 
-	/**
-	 * Return fixed field name that can be a keyword in nim
-	 */
-	public static function getFixedFieldName(name:String) {
-		switch name {
-			case "iterator":
-				return "fixedIterator";
-		}
-
-		return name;
-	}
 
 	/**
 	 * Return type parameters as string
@@ -264,11 +323,19 @@ class TypeResolver {
 		});
 	}
 
-	public static function resolveClassType(classType:ClassType, params:Array<Type>) : String
+	static function resolveClassTypeImpl(classType:ClassType, params:Array<Type>) : String
 	{
 		var sb = new StringBuf();
 		generateTInst(sb, classType, params);
 		return sb.toString();
+	}
+	public static extern overload inline function resolveClassType(classType:ClassType, params:Array<Type>) : String
+	{
+		return resolveClassTypeImpl(classType, params);
+	}
+
+	public static extern overload inline function resolveClassType(classType:ClassType) : String {
+		return resolveClassTypeImpl(classType, [for(t in classType.params) t.t]);
 	}
 
 	/**
@@ -306,4 +373,55 @@ class TypeResolver {
 		}
 		return sb.toString();
 	}
+
+	public static function asDynamicType(type:Type):String {
+		switch type {
+			case TAbstract(t, _) :
+				final tt = t.get();
+				if (tt.name != "Null" || tt.module != "StdTypes") 
+					type = TypeTools.followWithAbstracts(type);
+			default:
+				type = TypeTools.followWithAbstracts(type);
+		}
+		switch type {
+			case TEnum(t, params):
+				return "TEnum";
+			case TInst(t, params):
+				switch resolve(type) {
+					case "String" | "Null[String]" : return "TString";
+					default: return "TClass";
+				}
+				
+			//case TAbstract(t, params):
+			//	var res = simpleTypes.get(type);
+			//case TType(t, params):
+			//	generateTType(sb, t.get(), params);
+			case TFun(args, ret):
+				return "TFunc";
+			case TAnonymous(a):
+				return "TAnonWrapper";
+			case TDynamic(t):
+				return "TDynamic";
+			//case TMono(t):
+			//	generateTMono(sb, t.get());
+			case var v:	
+				final res = resolve(type);
+				switch res {
+					case "int32" | "Null[int32]" : return "TInt";
+					case "float" | "Null[float]" : return "TFloat";
+					case "bool" | "Null[bool]" : return "TBool";
+					case var s: 
+						switch v {
+						case TAbstract(_.get().name => "Null", params) :
+							return asDynamicType(params[0]);
+						default:
+							trace(s);
+							trace(resolve(v));
+						}
+						//return res;
+				}
+				throw 'Unsupported type ${v} of type ${type}';
+		}
+	}
+
 }

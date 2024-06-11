@@ -16,4 +16,14 @@ typedef EnumInfo = {
      * Params of type
      */
     var params:Array<Type>;
+
+    /**
+     * Nimified Name
+     */
+    var enumName: String;
+
+    /**
+     * Flag if enum is build
+     */
+    var isBuild: Bool;
 }

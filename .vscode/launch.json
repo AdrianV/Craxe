@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug main",
+            "program": "${workspaceFolder}/out/main",
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
             "name": "Haxe Interpreter",
             "type": "haxe-eval",
             "request": "launch",

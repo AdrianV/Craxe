@@ -3,7 +3,7 @@
 --dce full
 --main Mandelbrot
 -D nim-speed=fastest
--D nim-gc=orc
+-D nim-gc=arc
 -D eval-stack
 --each
 -D nim-out=./bin/nim/main.nim

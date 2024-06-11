@@ -1,5 +1,6 @@
 package craxe.common.ast;
 
+import craxe.generators.nim.NimNames;
 import haxe.macro.Expr;
 import craxe.common.ast.EntryPointInfo;
 import craxe.common.ast.type.*;
@@ -50,6 +51,10 @@ class CommonAstPreprocessor {
 		"haxe.MainLoop", "MainLoop", "haxe.EntryPoint", "EntryPoint",
 		"haxe.io.Bytes",
 		"haxe.NativeStackTrace", "haxe.StackItem", "haxe.SysTools", "Any", "Array", "StdTypes", "haxe.ds.Map", "haxe.exceptions."];
+
+	static inline function hasOwnName(c: ClassType, f: ClassField) {
+		return c.isExtern || f.isExtern || f.meta.has(":native");
+	}
 
 	/**
 	 * Filter not needed type. Return true if filtered
@@ -129,9 +134,11 @@ class CommonAstPreprocessor {
 			}
 		}
 		for (ifield in classFields) {
+			var used = false;
 			switch (ifield.kind) {
 				case FVar(_, _):
 					fields.push(ifield);
+					used = true;					
 				case FMethod(m):
 					switch (m) {
 						case MethNormal | MethInline:
@@ -139,11 +146,17 @@ class CommonAstPreprocessor {
 								isHashable = true;
 							}
 							methods.push(ifield);
+							used = true;
 						case MethMacro:
 						case v:
 							throw 'Unsupported ${v}';
 					}
 			}
+			if (used) 
+				if (! hasOwnName(c, ifield)) 
+					NimNames.normalize(ifield.name);
+				else
+					NimNames.fixOnly(ifield.name);
 		}
 		return {
 			fields: fields,
@@ -167,24 +180,31 @@ class CommonAstPreprocessor {
 		var entryMethod:ClassField = null;
 
 		for (ifield in classFields) {
+			var used = false;
 			switch (ifield.kind) {
 				case FVar(_, _):
 					fields.push(ifield);
+					used = true;
 				case FMethod(m):
 					switch (m) {
 						case MethNormal | MethInline:
 							methods.push(ifield);
+							used = true;
 							if (ifield.name == MAIN_METHOD) {
 								entryMethod = ifield;
 							}
 						case MethDynamic:
 							methods.push(ifield);
+							used = true;
 						case MethMacro:
 						
 						case v:
 							throw 'Unsupported ${v}';
 					}
 			}
+			if (used && ! hasOwnName(c, ifield))
+				NimNames.normalize(ifield.name);
+
 		}
 
 		return {
@@ -248,6 +268,7 @@ class CommonAstPreprocessor {
 							instanceRes.isHashable);
 
 		var entryPoint:EntryPointInfo = if (staticRes.entryMethod != null) {
+			classInfo.used = true;
 			{
 				classInfo: classInfo,
 				method: staticRes.entryMethod
@@ -264,9 +285,14 @@ class CommonAstPreprocessor {
 	 * Build enum info
 	 */
 	function buildEnum(c:EnumType, params:Array<Type>):EnumInfo {
+		for (f in c.constructs) {
+			NimNames.normalize(f.name);
+		}
 		return {
 			enumType: c,
-			params: params
+			params: params,
+			enumName: NimNames.normalize(c.name),
+			isBuild: false,
 		}
 	}
 
@@ -274,6 +300,14 @@ class CommonAstPreprocessor {
 	 * Build typedef info
 	 */
 	function buildTypedef(def:DefType, params:Array<Type>):TypedefInfo {
+		if (!def.isExtern) NimNames.normalize(def.name);
+		switch def.type {
+			case TAnonymous(a):
+				final an = a.get();
+				for (f in an.fields)
+					if (! f.isExtern && ! f.meta.has(":native")) NimNames.normalize(f.name);
+			default:
+		}
 		return new TypedefInfo(def, params);
 	}
 

@@ -16,6 +16,8 @@ class TestMap {
         m.set('foo', 'bar');
         m.set('bar', 'foo');
         trace(m.get('foo'));
+        trace(m.get('bar'));
+        trace(m.get('baz'));
         var m2 = m.copy();
         //$type(m2);
         m.clear();

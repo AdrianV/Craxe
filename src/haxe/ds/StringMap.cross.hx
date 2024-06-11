@@ -20,5 +20,4 @@ extern class StringMap<T> implements haxe.Constraints.IMap<String, T> {
     function remove(key:String):Bool;
     function set(key:String, value:T):Void;
     function toString():String;
-    //function blah(): HxKeyValue<String,T>;
 }

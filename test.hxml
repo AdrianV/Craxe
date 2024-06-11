@@ -1,10 +1,12 @@
 -lib craxe
 -D nim-out=./out/main.nim
--D nim-dynamic=enable
+#-D nim-dynamic=enable
 -D nim-speed=debug
--D nim-extra=-r
+-D nim-extra=-d:release
+-D nim-checks=off
 #--class-path test
---main test.Main
--D analyzer-optimize
---dce full
+--main test.TestDynamic
 
+-D analyzer-optimize
+#--dce full
+-lib timSrc

@@ -2,6 +2,7 @@
 
 
 import core
+import xstring
 
 type
     HaxeBytesData* = ptr seq[byte]
@@ -9,23 +10,23 @@ type
     HaxeBytes* = ref object of HaxeObject
         b*: seq[byte]
 
-    HaxeBytesStatic = object of HaxeStaticObject
 
 # Bytes
 
 #proc toString(this: HaxeBytesStatic, o: HaxeObjectRef): String =
 #    return 
 
-proc toHex*(this: HaxeBytes): HaxeString
+proc toHex*(this: HaxeBytes): String
 
-let HaxeBytesStaticInst* = HaxeBytesStatic(fparent: nil, fname: "haxe.io.Bytes",
-                                ftoString: proc(o: HaxeObjectRef): HaxeString {.closure} = return cast[HaxeBytes](o).toHex)
+var HaxeBytesStaticInst* = HaxeStaticObjectRef(qkind: TStatic, qparent: nil, qname: "haxe.io.Bytes",
+                                qtoString: proc(o: HaxeObjectRef): String {.closure} = return cast[HaxeBytes](o).toHex)
 
+core.register(HaxeBytes, HaxeBytesStaticInst)
 
 template alloc*(this:typedesc[HaxeBytes], size:int) : HaxeBytes =
-    HaxeBytes(fstatic: addr HaxeBytesStaticInst,b: newSeq[byte](size));
+    HaxeBytes(qkind: TClass, qstatic: HaxeBytesStaticInst, b: newSeq[byte](size));
 
-proc ofString*(this:typedesc[HaxeBytes], s: HaxeString) : HaxeBytes =
+proc ofString*(this:typedesc[HaxeBytes], s: String) : HaxeBytes =
     result = HaxeBytes(b: newSeq[byte](s.len))
     for i in 0 ..< s.len: 
         result.b[i] = s[i].byte
@@ -35,6 +36,11 @@ template get*(this:HaxeBytesData, pos:int):int32 =
 
 template get*(this:HaxeBytes, pos:int):int32 =
     this.b[pos].int32
+
+{.push checks:off.}
+template fastGet*(this:HaxeBytesData, pos:int):int32 =
+    get(this, pos)
+{.pop.}
 
 template set*(this:HaxeBytesData, pos:int, v:Natural): int32 =
     this[][pos] = v.byte
@@ -116,18 +122,20 @@ template getBytes*(this: HaxeBytesData): HaxeBytes =
     
 const hexChars = ['0','1','2','3','4','5','6','7','8','9','a','b','c','e','e','f']
 
-proc toHex*(this: openArray[byte]): HaxeString =
-    result.setLen(this.len * 2)
+proc toHex*(this: openArray[byte]): String =
+    var s = newStringOfCap(this.len * 2)
+    s.setLen(this.len * 2)
     for i in 0 ..< this.len:
         let v = this[i]
-        result[i * 2 + 1] = hexChars[v and 0xF]
-        result[i * 2] = hexChars[(v shr 4) and 0xF]
+        s[i * 2] = hexChars[(v shr 4) and 0xF]
+        s[i * 2 + 1] = hexChars[v and 0xF]
+    result = newASCIIString(s)
 
-template toHex*(this: HaxeBytesData): HaxeString =
+template toHex*(this: HaxeBytesData): String =
     toHex(this[])
 
-proc toHex*(this: HaxeBytes): HaxeString =
-    return this.fstatic.fname & "(" & toHex(this.b) & ")"
+proc toHex*(this: HaxeBytes): String =
+    return this.qstatic.qname & "(" & toHex(this.b) & ")"
 
 # proc newHaxeBytes*()
 
@@ -139,14 +147,16 @@ proc compare*(this, other: HaxeBytes): int32 =
         if r != 0 : r.int32
         else : (alen - blen).int32
 
-proc getString*(this: HaxeBytesData; pos, len: int32): HaxeString =
+proc getString*(this: HaxeBytesData; pos, len: int32): String =
+    var s: string
     var l2 = min(pos + len, this[].len)
     if l2 > pos:
         l2 = l2 - pos
-        result = newString(l2)
-        moveMem(addr result[0], addr this[pos], l2)
+        s = newString(l2)
+        moveMem(addr s[0], addr this[pos], l2)
+    return s.toXString
 
-template getString*(this: HaxeBytes; pos, len: int32): HaxeString =
+template getString*(this: HaxeBytes; pos, len: int32): String =
     getData(this).getString(pos, len)
 
 #template `$`(this: HaxeBytes): string =

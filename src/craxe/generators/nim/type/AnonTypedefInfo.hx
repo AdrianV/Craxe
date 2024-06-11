@@ -23,4 +23,7 @@ typedef AnonTypedefInfo = {
      * Fields of anon
      */
     var fields:Array<{name:String, type:Type}>;
+
+    @:optional 
+    var iterRet: Type;
 }

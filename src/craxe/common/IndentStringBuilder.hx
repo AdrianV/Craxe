@@ -10,6 +10,10 @@ enum IndentType {
 	Dec;
 }
 
+enum CallbackResult {
+	Str(v: String);
+	Data(v: String);
+}
 /**
  * Buffer item
  */
@@ -17,7 +21,10 @@ enum BufferItem {
 	Data(s:String);
 	Line(v:IndentType);
 	Indent(v:IndentType);
-	Call(cb: Int->String, ind: Int);
+	Call(cb: Int->CallbackResult);
+	Hook;
+	HookResult(hr: CallbackResult);
+	Sub(sub: IndentStringBuilder);
 }
 
 /**
@@ -49,9 +56,10 @@ class IndentStringBuilder {
 	/**
 	 * Current indent
 	 */
-	public var indent(default, set):Int;
+	var indent(default, set):Int;
 
 	public function set_indent(value:Int):Int {
+		indent = value;
 		return indent;
 	}
 
@@ -71,6 +79,9 @@ class IndentStringBuilder {
 		return indStr;
 	}
 
+	public function renderIndent(indent: Int, s: String) {
+
+	}
 	/**
 	 * Constructor
 	 */
@@ -140,14 +151,26 @@ class IndentStringBuilder {
 	 * Add a lazy callback
 	 * @param cb lazy callback
 	 */
-	public inline function addCallback(cb: Int->String) {
-		buffer.push(Call(cb, indent));
+	public function addCallback(cb: Int->CallbackResult) {
+		buffer.push(Call(cb));
+	}
+
+	public function addHook(): Int {
+		return buffer.push(Hook) - 1;
+	}
+
+	public function resolveHook(id: Int, data: CallbackResult) {
+		buffer[id] = HookResult(data);
+	}
+
+	public function addSub(sub: IndentStringBuilder) {
+		buffer.push(Sub(sub));
 	}
 
 	/**
 	 * Return string
 	 */
-	public inline function toString() {
+	public function toString() {
 		var res = new StringBuf();
 
 		var ind = 0;
@@ -178,19 +201,34 @@ class IndentStringBuilder {
 				res.add(s);
 				state = 1;
 			}
-			switch item {
-				case Data(s):
-					addData(s);
-				case Line(v):
-					state = 2;
-					res.add("\n");
-					proccIndent(v);
-				case Indent(v):
-					state = 3;
-					proccIndent(v);
-				case Call(cb, ind):
-					addData(cb(ind));
+			function perform(item: BufferItem) {
+				switch item {
+					case Data(s):
+						addData(s);
+					case Line(v):
+						state = 2;
+						res.add("\n");
+						proccIndent(v);
+					case Indent(v):
+						state = 3;
+						proccIndent(v);
+					case Call(cb):
+						switch cb(ind) {
+							case Str(v): res.add(v);
+							case Data(v): addData(v);
+						}
+					case Hook: // not resolved skip
+					case HookResult(hr):
+						switch hr {
+							case Str(v): res.add(v);
+							case Data(v): addData(v);
+						}
+					case Sub(sub):
+						for (it in sub.buffer)
+							perform(it);
+				}					
 			}
+			perform(item);
 		}
 
 		return res.toString();
