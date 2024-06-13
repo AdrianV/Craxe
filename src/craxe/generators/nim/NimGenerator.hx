@@ -532,7 +532,7 @@ class NimGenerator extends BaseGenerator {
 			sb.addBreak();
 
 			if (an.fields.length > 0) {
-				sb.add('proc makeDynamic(this:${anonName}) =');
+				sb.add('proc makeDynamic(this:${anonName}) {.nimcall.} =');
 				sb.addNewLine(Inc);
 				for (fld in an.fields) {
 					final fname = NimNames.fixFieldVarName(fld.name);
@@ -671,10 +671,9 @@ class NimGenerator extends BaseGenerator {
 						sb.add('var ${info.totalName}: $ft');
 						sb.addNewLine(Same);
 					} else {
-						sb.add('${info.totalName}');
 						final expr = field.expr != null ? field.expr() : null;
 						if (expr != null) {
-							sb.add(" = ");
+							sb.add('${info.totalName} = ');
 							methodBodyGenerator.generateExpression(sb, expr);
 						}
 					}
@@ -757,10 +756,9 @@ class NimGenerator extends BaseGenerator {
 				genFieldInfos(cls.classType.fields.get(), true, clsName);
 				sb.add(", qstaticFields: ");
 				genFieldInfos(cls.classType.statics.get(), false, '${clsName}Static');
+				#if (false)
 				sb.add(", qgetFields: ");
 				var fields = cls.classType.fields.get().map(f -> {name: NimNames.fixFieldVarName(f.name), isVar: f.kind.match(FVar(_,_))});
-
-
 				sb.addNewLine(Inc);
 				sb.add('proc ():seq[string] =');
 				sb.addNewLine(Inc);
@@ -768,6 +766,7 @@ class NimGenerator extends BaseGenerator {
 				sb.add('return @[${fldNames}]');
 				sb.addNewLine(Dec);
 				sb.addNewLine(Dec);
+				#end
 				final pureEmptyConstr = '${clsName}(qkind: TClass, qstatic: cl)';
 				sb.add(', qcempty: proc(cl: HaxeStaticObjectRef): HaxeObjectRef = ${pureEmptyConstr}');
 				sb.addNewLine(Same);
@@ -795,7 +794,7 @@ class NimGenerator extends BaseGenerator {
 			final superCls = cls.classType.superClass;
 			if (superCls != null) {
 				final superName = TypeResolver.resolveClassType(superCls.t.get(), superCls.params);
-				sb.add(', qparent: ${superName}StaticInst');
+				sb.add(', qparent: addr ${superName}StaticInst[]');
 			}
 			if (hasStaticVar) {
 				for (f in staticFields) switch f.kind {
@@ -920,6 +919,7 @@ class NimGenerator extends BaseGenerator {
 					sb.addBreak();
 					#end
 					
+					#if (false)
 					sb.add('proc getFieldByNameInternal${params}(this:${clsName}, name: string):Dynamic =');
 					sb.addNewLine(Inc);
 					if (fields.length > methods.length) {
@@ -933,6 +933,7 @@ class NimGenerator extends BaseGenerator {
 						sb.add("discard");
 					}
 					sb.addBreak();
+					#end
 
 					#if (false)
 					sb.add('proc fromDynamic${params}(this:Dynamic):${clsName} =');

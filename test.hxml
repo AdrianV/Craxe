@@ -1,11 +1,13 @@
 -lib craxe
+#-cp test/benchmarks/fibtree/src
 -D nim-out=./out/main.nim
 #-D nim-dynamic=enable
 -D nim-speed=debug
--D nim-extra=-d:release
+# -D nim-extra=-d:release
 -D nim-checks=off
 #--class-path test
---main test.TestDynamic
+--main test.Main
+#--main Tree
 
 -D analyzer-optimize
 #--dce full

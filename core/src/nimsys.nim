@@ -32,7 +32,7 @@ proc getEnv*(s: string): String =
 
 proc isOfType*(a: HaxeObjectRef; b: AnyClass): bool = 
     var ac = addr a.qstatic[]
-    while ac != nil :
+    while not ac.isNil :
         if ac.qtype.qcidx == b.qcidx : return true
         ac = ac.qparent
     return false
@@ -92,4 +92,4 @@ when false:
   proc isOfType*(a,b: HaxeObjectRef): bool = 
       var bc = b.qstatic
       if bc != nil: return isOfType(a, bc[])
-      return a.qstatic == nil
+      return a.qstatic.isNil

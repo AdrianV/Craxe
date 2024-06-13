@@ -797,7 +797,7 @@ class MethodExpressionGenerator {
 				type: x.expr.t
 			}));
 		}
-		final stodyn = fields.length > 0 ? 'cast[proc (_: DynamicHaxeObjectRef) {.nimcall.}]((proc (_: ${object.name}))(makeDynamic))' : 'nil';
+		final stodyn = fields.length > 0 ? 'unsafeDowncast[proc (_: DynamicHaxeObjectRef) {.nimcall.}, proc (_: ${object.name}) {.nimcall}](makeDynamic)' : 'nil';
 		sb.add('${object.name}(qkind: TAnon, qtodyn: ${stodyn}');
 		var hasFields = false;
 		for (field in fields) {
@@ -852,6 +852,14 @@ class MethodExpressionGenerator {
 		if ('${toExpr.pos}'.contains(':67:')) {
 			trace(typTo);
 		}
+		inline function resolveFrom() {
+			return switch fromExpr.expr {
+				case TCast(e, _): 
+					fromExpr = e;
+					TypeResolver.resolve(e.t);
+				default: TypeResolver.resolve(fromExpr.t);
+			}
+		}
 		switch typTo {
 			case TDynamic(_):
 				generateInnerExpr();
@@ -863,36 +871,38 @@ class MethodExpressionGenerator {
 					case TFun(fargs, fret):
 						if (args.length != fargs.length) 
 							throw 'arguments length differ at ${toExpr.pos}';
-						sb.add('(proc(');
-						var params = [];
-						for (i => a in fargs) {
-							if (i > 0) sb.add(", ");
-							final pname = NimNames.normalize(a.name);
-							params.push(pname);
-							final tname = TypeResolver.resolve(args[i].t);
-							sb.add('${pname}: ${tname}');
+						final fromType = resolveFrom();
+						final toType = TypeResolver.resolve(toExpr.t);
+						final isSame = fromType == toType;
+						if (! isSame) {
+							sb.add('(proc(');
+							var params = [];
+							for (i => a in fargs) {
+								if (i > 0) sb.add(", ");
+								final pname = NimNames.normalize(a.name);
+								params.push(pname);
+								final tname = TypeResolver.resolve(args[i].t);
+								sb.add('${pname}: ${tname}');
+							}
+							final tt = TypeResolver.resolve(ret);
+							sb.add('):${tt} = ');
+							final promo = new TypePromotion(this, sb, ret);
+							promo.start(true);
+							generateInnerExpr();
+							sb.add("(");
+							sb.add(params.join(", "));
+							sb.add(")");
+							promo.promote({expr: TIdent(""), t: fret, pos: null});
+							promo.discard(fret);
+							sb.add(")");
+						} else {
+							generateInnerExpr();
 						}
-						final tt = TypeResolver.resolve(ret);
-						sb.add('):${tt} = ');
-						final promo = new TypePromotion(this, sb, ret);
-						promo.start(true);
-						generateInnerExpr();
-						sb.add("(");
-						sb.add(params.join(", "));
-						sb.add(")");
-						promo.promote({expr: TIdent(""), t: fret, pos: null});
-						promo.discard(fret);
-						sb.add(")");
 					case var v:
 						throw 'Unsupported type $v';
 				}
 			case _:
-				final fromType = switch fromExpr.expr {
-					case TCast(e, _): 
-						fromExpr = e;
-						TypeResolver.resolve(e.t);
-					default: TypeResolver.resolve(fromExpr.t);
-				}
+				final fromType = resolveFrom();
 				//final fromType = TypeResolver.resolve(fromExpr.t);
 				final toType = TypeResolver.resolve(toExpr.t);
 				if (toType == "int32" && fromType != toType) {
@@ -916,7 +926,7 @@ class MethodExpressionGenerator {
 							case [TInst(_, _), TInst(_, _)] | [TEnum(_, _), TEnum(_, _)] :
 								needCast = true;
 							default:
-								throw 'Unsupported cast from ${fromType} to ${toType}';		
+								trace('Unsupported cast from ${fromType} to ${toType}');		
 						}
 						if (needCast) sb.add('cast[$toType](');
 						switch fromExpr.expr {

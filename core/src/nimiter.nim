@@ -49,9 +49,12 @@ when false:
             )
         else: raise newException(ValueError, "not an anon")
 
-proc makeDynamic*[K,V](this:HaxeKeyValue[K,V]) =
+proc makeDynamic*[K,V](this:HaxeKeyValue[K,V]) {.nimcall.} =
     this.qfields.insert("key", fromField(this.key))
     this.qfields.insert("value", fromField(this.value))
 
+proc makeDynamic*[V](this:HaxeIterator[V]) {.nimcall.} =
+    this.qfields.insert("hasNext", fromField(this.hasNext))
+    this.qfields.insert("next", fromField(this.next))
 
 

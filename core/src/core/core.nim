@@ -72,7 +72,7 @@ type
         qname*: string
         qfields*: FieldInfos
         qstaticFields*: FieldInfos
-        qgetFields*: proc(): seq[string]
+        # qgetFields*: proc(): seq[string]
         qtoString*: proc(o: HaxeObjectRef): String {.closure.}
         qcempty*: proc(cl: HaxeStaticObjectRef): HaxeObjectRef {.nimcall.}
         qcfun*: proc(cl: HaxeStaticObjectRef, params: seq[Dynamic]): HaxeObjectRef {.nimcall.}
@@ -232,6 +232,9 @@ type
     Reflect* = object
     Type* = object
 
+
+template unsafeDowncast*[A, B](v: B): A =
+    cast[A](cast[pointer]((B) v))
 
 const NO_TYPE = 0.TypeIndex
 
@@ -833,6 +836,9 @@ proc fromDynamic*(this:Dynamic, t:typedesc[float]) : float =
 
 proc fromDynamic*(this:Dynamic, t:typedesc[bool]) : bool =
     fromDynamic(this, bool, result)
+
+proc fromDynamic*[V: bool | int32 | float](this:Dynamic, t:typedesc[Null[V]]) : V =
+    fromDynamic(this, V, result)
 
 proc fromDynamic*(this:Dynamic, t:typedesc[String]) : String =
     result = if this != nil : 
